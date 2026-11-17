@@ -48,7 +48,7 @@
   <div class="flow">
     <div class="step"><b>One row</b>India's exports of one product group (2-digit HS code, e.g. "30 Pharmaceuticals") to one country in one year.</div>
     <div class="step"><b>Target: collapse</b>Next year's value falls by more than 26% (log change below −0.3) or drops to zero.</div>
-    <div class="step"><b>Prediction time</b>End of year t. Every input uses year t or earlier. Next year's numbers are never used.</div>
+    <div class="step"><b>Prediction time</b>End of year t. Every input uses year t or earlier. Next year's numbers are never used. In real use, year-t trade data is published with a delay, so the warning would arrive later than this.</div>
     <div class="step"><b>Output</b>A risk score from 0 to 1 for each flow, and a watch list of the 10% riskiest.</div>
   </div>
   <h3>Prediction vs decision</h3>
@@ -123,11 +123,14 @@
   <div class="table-wrap"><table>
     <tr><th>Method</th><th>What it does</th><th>Why it is here</th></tr>
     <tr><td><b>Random</b></td><td>Picks flows at random.</td><td>The floor. Its watch-list hit rate is just the collapse rate (about 23%).</td></tr>
+    <tr><td><b>Jump rule</b></td><td>Ranks flows by this year's change, biggest rise first. No learning.</td><td>A second simple baseline: many of the riskiest flows are ones that just jumped, so we check whether this alone does as well.</td></tr>
     <tr><td><b>Volatility rule</b></td><td>Ranks flows by how jumpy they were over the last 5 years. No learning.</td><td>The honest baseline: the first thing a trade analyst would try. Any model must beat this to be worth it.</td></tr>
     <tr><td><b>Logistic regression</b></td><td>A weighted sum of the inputs, turned into a probability (L2 penalty, C = 1).</td><td>Simple, readable, but cannot see interactions (e.g. "jumpy <i>and</i> the buyer is shrinking").</td></tr>
     <tr><td><b>Boosted trees</b> (scikit-learn HistGradientBoosting)</td><td>300 small trees, each fixing the mistakes of the ones before (learning rate 0.05).</td><td>Main model. Handles skewed inputs, blanks and interactions without hand-made features.</td></tr>
     <tr><td><b>XGBoost</b></td><td>The same idea from another library (300 trees, depth 5, learning rate 0.05).</td><td>A check that the result is not one library's quirk. Also gives exact per-input reasons (SHAP).</td></tr>
   </table></div>
+  <p>Boosted trees are the main model for all test results, including the "Check a past year" tool. XGBoost was tested in exactly the same way (AUC 0.735 vs 0.731).
+  It is used for the 2025 watch list only because it gives exact reasons for each flow, not because it scored higher.</p>
   <p class="muted small">Deep learning was left out on purpose: the inputs are a small table of numbers, where tree ensembles are the standard strong choice, and the course question is about evaluation, not model size.</p>
 </section>
 
@@ -179,7 +182,11 @@
   <h3>Which inputs help? (ablation, walk-forward 2011-2020, boosted trees)</h3>
   <div class="table-wrap" id="ablation-table"></div>
   <p class="muted">Most of the skill comes from the flow's own history. Each extra group adds a little, and all together give the best score.
-  Better data choices (zero years, the $1M filter, no leakage) mattered more than the choice between the three learning models, which are within 0.025 AUC of each other.</p>
+  The three learning models are within 0.025 AUC of each other.</p>
+  <h3>How many collapses does the watch list catch?</h3>
+  <p id="recall-text">Loading…</p>
+  <h3>Does "rank by this year's jump" do as well?</h3>
+  <p id="jump-text">Loading…</p>
   <h3>Is the model just finding the obvious?</h3>
   <p id="obvious-text">Loading…</p>
 </section>
@@ -250,6 +257,9 @@
   <h2>Limitations</h2>
   <ul>
     <li><b>The gain is real but modest.</b> AUC 0.73 vs 0.69 for a simple rule. About half of the model's correct warnings are flows the rule also flags.</li>
+    <li><b>Almost no gain for the biggest flows.</b> For flows over $100M, the model's AUC is 0.753 and the volatility rule's is 0.752. These are the flows that matter most to an exporter, so for them the simple rule is about as good.</li>
+    <li><b>The watch list misses most collapses.</b> A list of 10% of flows can only hold part of the roughly 22% that collapse; it caught about a quarter of all collapses.</li>
+    <li><b>2011-2020 was used both to develop and to report.</b> Settings were fixed in advance and only one small design choice was checked on these years, but the frozen 2021-2024 test is the cleanest result.</li>
     <li><b>Blind to new shocks.</b> Bans, wars, sanctions and sudden policy changes leave no trace in past trade, so steady flows hit by them are missed.</li>
     <li><b>2-digit product groups are coarse.</b> "Machinery" mixes very different goods; a collapse in one part can be hidden by growth in another.</li>
     <li><b>The 26% cut-off is a choice.</b> A different line gives a different question. The table also keeps a stricter target (the flow halves or stops), left for future work.</li>

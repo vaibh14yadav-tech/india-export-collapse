@@ -191,6 +191,9 @@
     const order = ["volatility rule", "logistic", "trees", "xgboost"];
     const wf = S.models["walk-forward"], fr = S.models["frozen"];
     const rows = [{ m: "Random picking", a1: "0.500", t1: pct(S.average["walk-forward"].base_rate, 1), a2: "0.500", t2: pct(S.average.frozen.base_rate, 1), b: "–" }];
+    const J = S.jump_rule;
+    if (J) rows.push({ m: "Jump rule (baseline)", a1: f3(J["walk-forward"].auc), t1: pct(J["walk-forward"].top10, 1), p1: f3(J["walk-forward"].pr_auc),
+      a2: f3(J.frozen.auc), t2: pct(J.frozen.top10, 1), b: "– (ranking only)" });
     order.forEach((k) => {
       const a = wf.find((r) => r.method === k), b = fr.find((r) => r.method === k);
       if (!a) return;
@@ -211,6 +214,18 @@
       S.ablation.map((d) => ({ i: d.inputs, n: d.n_inputs, a: f3(d.auc) })).concat([{ i: "<span class='muted'>volatility rule, for comparison</span>", n: 1, a: f3(S.average["walk-forward"].auc_rule) }]));
 
     const E = S.errors, F = E.facts;
+    const F0 = S.errors.facts;
+    document.getElementById("recall-text").innerHTML =
+      `Across 2011-2024 there were <b>${F0.all_collapses.toLocaleString()}</b> collapses, and the model's watch list caught <b>${F0.caught_total.toLocaleString()}</b> of them ` +
+      `(<b>${pct(F0.share_of_collapses_caught)}</b>; the volatility rule's list caught ${pct(F0.share_of_collapses_caught_rule)}). ` +
+      `A list of 10% of flows cannot hold all of the roughly 22% that collapse, so most collapses are not on it. ` +
+      `The list is a short list of the clearest risks, not a net that catches everything.`;
+    if (J) document.getElementById("jump-text").innerHTML =
+      `Many of the highest risks are flows that just jumped, so we also tested a <b>jump rule</b>: rank flows by this year's change, biggest rise first. ` +
+      `Its watch list is better than the volatility rule's (${pct(J["walk-forward"].top10)} vs ${pct(S.average["walk-forward"].top10_rule)} in 2011-2020), but its AUC is much lower ` +
+      `(${f3(J["walk-forward"].auc)}), because it ranks the rest of the flows badly. The model beats it on AUC in <b>${J["walk-forward"].model_wins_auc} of 10</b> years ` +
+      `and <b>${J.frozen.model_wins_auc} of 4</b> frozen years, and on watch-list hit rate in <b>${J["walk-forward"].model_wins_top10} of 10</b> and <b>${J.frozen.model_wins_top10} of 4</b>. ` +
+      `So "it jumped, it will fall back" explains part of the model's watch list, but not all of it.`;
     document.getElementById("obvious-text").innerHTML =
       `Partly. Of the collapses the watch list caught, <b>${pct(F.caught_also_on_rule_list)}</b> were also on the volatility rule's list: jumpy flows anyone would flag. ` +
       `The other <b>${pct(1 - F.caught_also_on_rule_list)}</b> the rule missed; the model found them by combining clues such as a shrinking buyer or India's other products to that country falling. ` +
