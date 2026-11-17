@@ -165,7 +165,7 @@ Most of the skill comes from the flow's own history: even 2 inputs beat the vola
 
 **Stricter target.** If a collapse means the flow **halves or stops** (log change below −0.69, 10.2% of rows), the model still beats the volatility rule: AUC 0.821 vs 0.779 in 2011-2020 and 0.819 vs 0.783 in 2021-2024; watch list right 41% vs 35% and 38% vs 33% (random: 10% and 9%).
 
-**Are the risk scores honest percentages?** Splitting all out-of-sample flows into 10 equal groups by risk, the real collapse rate is within about 2.3 points of the average predicted risk in every group (for example 55% predicted vs 54% real in the riskiest tenth). Brier score 0.153. No calibration step was applied after training.
+**Are the risk scores honest percentages?** Splitting all out-of-sample flows into 10 equal groups by risk, the real collapse rate is within about 2.3 points of the average predicted risk in every group (2.7 points in the saved notebook run). But the scores run **slightly low**: in 9 of 10 groups more flows really collapsed than predicted (for example 4.6% predicted vs 6.7% real in the safest tenth). Only the riskiest tenth is slightly high (55% predicted vs 54% real). Brier score 0.153. No calibration step was applied after training.
 
 **What these results show:**
 
@@ -199,7 +199,7 @@ That shock happens in the year being predicted, so no input could have shown it 
 * The 26% cut-off is a choice. A different cut-off would ask a slightly different question.
 * **Many collapses are spikes falling back.** A collapse is measured against this year's value, so a flow that jumps 4× and gives back a quarter counts. 27% of all collapses end at or above the level of two years earlier, and 30% came right after the flow at least doubled. Much of the watch list is this kind of flow. A target measured against a 3-year average would separate real lost markets from jumps falling back.
 * **2024 GDP is carried forward.** 2024 GDP was not yet published, so the 2025 list uses each country's latest known GDP (64 of 6,487 flows still have none). This is an approximation.
-* **Risk scores were checked, not adjusted.** They match real collapse rates within about 2.3 points in every tenth of flows, but no calibration step was applied after training.
+* **Risk scores run slightly low.** They are within about 2-3 points of real collapse rates in every tenth of flows, but in 9 of 10 groups the real rate is higher than predicted. No calibration step was applied after training.
 * **Timing.** BACI data for a year is published about 13 months after the year ends, so in real use a warning would arrive after most of the next year has passed, and the "2025 watch list" describes a year that has already ended.
 * The years 2011-2020 were used both to develop the project and to report results. Settings were fixed in advance, but the frozen 2021-2024 test is the cleanest result.
 * The model is built and tested only on India's exports.
@@ -224,7 +224,7 @@ Every number in this README and on the website was produced by running the code 
 
 The website's charts and tables read their numbers from the files in `docs/data/`, which the second notebook writes.
 
-**A note on differences between runs:** the website and this README use one run of the notebooks. The outputs saved inside `notebooks/` come from a second run on Google Colab with slightly different library versions. Overall averages differ only in the third decimal (for example 4,417 instead of 4,408 collapses caught, boosted-trees AUC 0.730 instead of 0.731), but single-year watch-list hit rates can differ by up to about 2 points. This changes one count: the model beats the jump rule's watch list in 11 of 14 years in the site's run and 13 of 14 in the saved notebooks. The main conclusions are the same. `notebooks/extra_baselines.py` is a short stand-alone version of the small-tree and spike checks; the numbers reported above come from Step 5b of the analysis notebook.
+**A note on differences between runs:** the website and this README use one run of the notebooks, done by the AI assistant outside Colab with the package versions pinned in `requirements.txt`. The outputs saved inside `notebooks/` come from a second run on Google Colab with slightly different library versions. Overall averages differ only in the third decimal (for example 4,417 instead of 4,408 collapses caught, boosted-trees AUC 0.730 instead of 0.731), but single-year watch-list hit rates can differ by up to about 2 points. This changes one count: the model beats the jump rule's watch list in 11 of 14 years in the site's run and 13 of 14 in the saved notebooks. The main conclusions are the same. `notebooks/extra_baselines.py` is a short stand-alone version of the small-tree and spike checks; the numbers reported above come from Step 5b of the analysis notebook in the website's run. The saved output of Step 5b in `notebooks/` is from my own Colab run, so its third decimal can differ (for example the 7-input tree's watch-list hit rate is 54.4% in the website's run and 53.9% in the saved notebook).
 
 **Package versions:** `requirements.txt` pins the versions of the run behind the website and this README. The saved notebook outputs came from Google Colab's versions at the time, which explains the small differences above.
 
