@@ -2,91 +2,206 @@
 
 **ES 335 Machine Learning, IIT Gandhinagar, 2026** · Vaibhav Yadav (25110335), individual project
 
-**Live website:** https://vaibh14yadav-tech.github.io/india-export-collapse/  ·  **Code:** https://github.com/vaibh14yadav-tech/india-export-collapse
+**Website:** https://vaibh14yadav-tech.github.io/india-export-collapse/  ·  **Code:** https://github.com/vaibh14yadav-tech/india-export-collapse
 
 ---
 
-## 1. Question
+## 1. What this project is about
 
-> Using only what is known at the end of year t, which of India's export flows (one product group to one country) will **collapse** in year t+1?
+India exports almost a hundred kinds of products to more than two hundred countries. Most of these trade flows are fairly stable from one year to the next, but every year some of them suddenly fall: a country stops buying Indian rice, steel sales to a buyer halve, or a market for medicines disappears. For an exporter, an export-credit insurer or a government trade office, it would be useful to know **in advance** which flows are most at risk, so they can check on those buyers first.
 
-* **One row** = India's exports of one HS 2-digit product group to one country in one year.
-* **Target (collapse)** = next year's value falls by more than 26% (log change below −0.3) or drops to zero.
-* **Prediction time** = end of year t. Every input uses year t or earlier.
-* **Decision it supports** = which flows to review first (a watch list of the 10% riskiest). The model predicts risk; it does not decide what to do.
-* Results are predictive associations, not causal effects.
+This project asks one question:
 
-## 2. Main results
+> **Using only what is known at the end of a year, can we predict which of India's export flows will collapse in the following year?**
 
-Walk-forward test (answer years 2011-2020, retrained every year) and frozen post-COVID test (trained once on answers up to 2020, scored on 2021-2024 without retraining).
+To make the question precise:
 
-| Method | AUC 2011-20 | Top-10% hit rate 2011-20 | AUC 2021-24 (frozen) | Top-10% hit rate 2021-24 |
+* **One row of data** is India's exports of one product group to one country in one year. For example, "India's medicine exports to Nigeria in 2015" is one row. There are 96 product groups (the 2-digit groups of the international HS product codes).
+* **A collapse** means that next year's exports in that row fall by more than about a quarter (26%), or stop completely. About 22% of rows collapse in a normal year.
+* **The prediction is made at the end of the year**, using only that year's and earlier numbers. Nothing from the following year is ever used as an input.
+* **The output** is a risk score between 0 and 1 for every flow. The 10% of flows with the highest scores form a **watch list**: the short list of flows someone should look at first.
+
+The model only predicts risk. It does not decide what anyone should do: whether a warning is worth acting on depends on how big the flow is and how costly it is to act, which the model does not know. The model also finds patterns that tend to come *before* a collapse; it does not explain what *causes* one.
+
+## 2. The data
+
+### Where it comes from
+
+| Source | What we use from it | How to get it |
+|---|---|---|
+| **CEPII BACI** (HS92, version 202601) | Every country's trade with every other country, product by product, for 1995-2024, in thousands of US dollars | Free download from the CEPII website (BACI page). File: `BACI_HS92_V202601.zip`, about 2.4 GB |
+| **CEPII Gravity** (version 202211) | Facts about each pair of countries: distance, shared border, shared language, WTO membership, trade agreements | Free download from the CEPII website (Gravity page). File: `Gravity_csv_V202211.zip` |
+| **World Bank** (World Development Indicators) | Each buying country's GDP and population | Read directly into the notebook from `https://raw.githubusercontent.com/datasets/gdp/main/data/gdp.csv` and `.../datasets/population/main/data/population.csv` |
+
+The raw files are too large to store on GitHub, so this repository only contains the small result files that the website reads (in `docs/data/`).
+
+### How the raw data becomes the final table
+
+1. **Read 30 years of BACI.** For every year, we keep India's exports to each country, and each country's total imports from the whole world. Products are grouped from 6-digit codes into the 96 two-digit product groups. This gives **405,322** India export records.
+2. **Fill in the missing years with zero.** BACI only lists trades that happened. If India stopped selling a product to a country, that row simply disappears. Without filling these gaps, the worst collapses (complete stops) would be invisible. After filling, there are **591,060** rows for 19,702 country-product pairs, and 31% of them are zero years.
+3. **Work with changes on a log scale.** Trade values range from $1 million to tens of billions, so values are put on a log scale and yearly changes are measured as log changes. A log change of −0.3 means a fall of about 26%, and rises and falls of the same size become symmetric.
+4. **Add the other data.** Each row gets the buying country's GDP and population from the World Bank, and distance, language, border and trade-agreement facts from the Gravity file.
+5. **Keep only meaningful flows.** We drop flows smaller than $1 million in a year, because tiny shipments jump up and down randomly and would add noise. We also drop rows whose next year is not known yet.
+
+The final table has **131,550 rows**, covering data years 1996 to 2023, and **21.9%** of them collapse the following year.
+
+### Checks and known gaps
+
+* At every step the notebook prints check numbers (for example, India's total exports in 2015 and the value of one specific flow) to make sure each step worked as intended.
+* The World Bank often has not yet published GDP for the latest year, so that value is left blank. The models are able to handle blanks.
+* The Gravity file ends in 2021, so later years reuse the last known values. Distance and language do not change, so this matters very little.
+
+## 3. What the model looks at
+
+For every row, the model sees **24 inputs**, all calculated from information available at the end of that year:
+
+| Group | Inputs | Why they might help |
+|---|---|---|
+| **The flow's own history** (7) | its size; how much it changed this year, last year and two years ago; how much it usually swings (volatility over the last 5 years); its 3-year trend; how many of the last 5 years it was traded at all | Flows that swing a lot, are shrinking, or are new tend to collapse more often |
+| **The buyer's market** (6) | whether the buyer's imports of this product are growing; whether the buyer's total imports are growing; India's share of the buyer's market and how it changed; whether India's exports of this product to all countries are growing; how important this buyer is for India | Is the buyer shrinking, or is India losing ground to other sellers? |
+| **The buying country** (8) | GDP growth; size of its economy; population; distance from India; shared border; shared official language; WTO membership; trade agreement with India | Slow-moving facts about the buyer and its links to India |
+| **India's other flows** (3) | the share of India's *other* products to this buyer that fell sharply this year; their average change; the share of *other* countries where this same product fell | Collapses tend to come in groups, either across products to one country or across countries for one product |
+
+## 4. The methods compared
+
+A model is only useful if it beats simple rules that anyone could apply. So the project compares learning models against simple baselines:
+
+| Method | What it does | Why it is included |
+|---|---|---|
+| **Random guessing** | Picks flows at random | The floor: its watch list is right only as often as flows collapse in general (about 23%) |
+| **Volatility rule** | Ranks flows by how much they have swung over the last 5 years. No learning involved | The main baseline. It is the first thing a trade analyst would try, and any model must beat it to be worth using |
+| **Jump rule** | Ranks flows by how much they rose this year | A second simple baseline, because many of the riskiest flows turn out to be ones that just jumped |
+| **Logistic regression** | Adds up the inputs with learned weights and turns the sum into a probability | A simple, readable model. It cannot capture combinations such as "jumpy *and* the buyer is shrinking" |
+| **Boosted trees** (scikit-learn HistGradientBoosting) | Builds 300 small decision trees, each one correcting the mistakes of the trees before it | **The main model.** It handles skewed values, blanks and combinations of inputs without extra work |
+| **XGBoost** | The same idea as boosted trees, from a different library | A check that the result does not depend on one library. It is also used for the 2025 watch list because it can show the reasons behind each warning |
+
+The model settings (number of trees, learning rate and so on) were fixed in advance to sensible standard values and were never tuned on the test years.
+
+## 5. How the models were tested
+
+### Why not a normal random split
+
+The usual way to test a model is to shuffle the data and hold some rows back. Here that would be cheating: the model could learn from 2019 and then "predict" 2012, which nobody could do in real life, and the scores would look better than they really are. So every model is tested the way it would actually be used: **it always predicts a year it has never seen.** There are two tests.
+
+### Test 1: walk-forward test (2011-2020)
+
+We pretend to stand at the end of each year and predict the next one, ten times in a row.
+
+* **Example.** To predict which flows collapse in **2013**, the model is trained only on rows from **2011 and earlier**, because their outcomes (what happened in 2012 and before) were already known at the end of 2012. The model is then given each flow's **2012** numbers as inputs and asked which flows will collapse in 2013. Its predictions are compared with what really happened in 2013.
+* The 2012 rows are not used for training in this step, because their outcome *is* 2013, the year being predicted. They become training data one step later, when the model predicts 2014.
+* This is repeated for each year from 2011 to 2020, retraining the model every time with the newly known year added. The results reported for this test are the **average over these 10 years**.
+
+### Test 2: frozen post-COVID test (2021-2024)
+
+COVID disrupted world trade, so we also check whether a model built on the pre-COVID world still works afterwards.
+
+* The model is trained **once**, on all rows whose outcome was known by 2020, and then **frozen**: it is never retrained or adjusted again.
+* That same frozen model predicts 2021, 2022, 2023 and 2024. The results reported for this test are the **average over these 4 years**.
+* None of these four years was used to make any choice in the project, so this is the cleanest and most honest test.
+
+### How the predictions are scored
+
+* **AUC.** Take one flow that collapsed and one that did not. AUC is how often the method gives the collapsed flow the higher risk score. 0.5 means no better than a coin flip; 1.0 would be perfect.
+* **Watch list hit rate.** Of the 10% of flows a method flags as riskiest, the share that really collapsed. This matches the real use: a team that only has time to check one flow in ten.
+* **PR-AUC and Brier score** are also calculated in the notebooks. Plain accuracy is not used, because 78% of flows do not collapse, so a model that always says "no collapse" would already be 78% accurate while being useless.
+* **Is the difference just luck?** Flows to the same country tend to move together, so we re-ran the comparison 500 times, each time on a random mix of countries (a "bootstrap"), and looked at how much the model's advantage over the volatility rule varies.
+
+## 6. Results
+
+| Method | AUC, walk-forward 2011-20 | Watch list right, walk-forward 2011-20 | AUC, frozen 2021-24 | Watch list right, frozen 2021-24 |
 |---|---|---|---|---|
-| Random picking | 0.500 | 22.9% | 0.500 | 20.1% |
-| Jump rule (rank by this year's rise) | 0.617 | 52.4% | 0.601 | 46.2% |
-| Volatility rule (baseline) | 0.694 | 47.0% | 0.701 | 44.3% |
+| Random guessing | 0.500 | 22.9% | 0.500 | 20.1% |
+| Jump rule | 0.617 | 52.4% | 0.601 | 46.2% |
+| Volatility rule (main baseline) | 0.694 | 47.0% | 0.701 | 44.3% |
 | Logistic regression | 0.711 | 53.3% | 0.719 | 50.8% |
 | **Boosted trees (main model)** | **0.731** | **54.2%** | **0.733** | **51.4%** |
 | XGBoost | 0.735 | 54.9% | 0.735 | 51.8% |
 
-* Boosted trees beat the volatility rule in **10 of 10** walk-forward years and **4 of 4** frozen years.
-* The watch list (top 10% of flows) caught **4,408 of 18,295** collapses in 2011-2024 (24%; the volatility rule's list caught 21%).
-* For flows over $100M the gain is close to zero (AUC 0.753 vs 0.752).
-* Resampling whole countries 500 times (bootstrap), the AUC gain over the rule is **+0.037** (95% range 0.031 to 0.043) walk-forward and **+0.032** (0.024 to 0.041) frozen.
-* **Main failure mode:** steady flows hit by a sudden shock from the buyer. The watch list catches 41% of collapses among the jumpiest third of flows, but only 0.4% among the steadiest third. Lumpy products (fuel, gems, aircraft, ships, arms) are 4% of flows but 12% of the watch list.
+**What these results show:**
 
-## 3. Data access
+* **The model beats the main baseline in every year.** Boosted trees score higher than the volatility rule in all 10 walk-forward years and in all 4 frozen post-COVID years. The model still works after COVID without retraining.
+* **The gain is real but modest.** On average the model's AUC is 0.04 higher than the volatility rule's. In the 500-times bootstrap check, the 95% range of the gain is **+0.031 to +0.043** in 2011-2020 and **+0.024 to +0.041** after COVID. Both ranges stay above zero, so the gain is not luck in which countries happened to be tested.
+* **The watch list is right about half the time,** more than twice as often as random guessing. With a watch list of about 600 flows a year, being right 54% instead of 47% of the time means roughly 40 more real collapses caught per year for the same amount of checking.
+* **The jump rule is not enough on its own.** Its watch list does better than the volatility rule's (52% vs 47%), but its AUC is much lower (0.62), because it ranks the rest of the flows badly. The model beats it on AUC in all 14 years and on watch-list hits in 11 of 14.
+* **The watch list does not catch every collapse.** Across 2011-2024 it caught **4,408 of 18,295** collapses (24%); the volatility rule's list caught 21%. A list holding 10% of flows cannot contain all of the roughly 22% that collapse. It is a short list of the clearest risks, not a net that catches everything.
+* **Which inputs help.** Using only the flow's own history already gives an AUC of 0.722. Adding the buyer's market, the country facts and India's other flows raises it step by step to 0.731.
 
-No data files are stored in this repository except the small result files the website reads (`docs/data/`).
+## 7. Where the model fails (error analysis)
 
-| Source | What is used | How to get it |
-|---|---|---|
-| CEPII BACI, HS92, version 202601 | Bilateral trade by 6-digit product, 1995-2024 (US$ thousands) | Free download from the CEPII website (BACI page). File: `BACI_HS92_V202601.zip`, about 2.4 GB |
-| CEPII Gravity, V202211 | Distance, border, language, WTO, trade agreements | Free download from the CEPII website (Gravity page). File: `Gravity_csv_V202211.zip` |
-| World Bank WDI (GDP, population) | GDP (current US$) and population of each buyer | Read directly in the notebook from `https://raw.githubusercontent.com/datasets/gdp/main/data/gdp.csv` and `.../datasets/population/main/data/population.csv` |
+The model makes two kinds of mistakes: **false alarms** (on the watch list, but no collapse) and **missed collapses** (collapsed, but not on the list). Looking at where these happen shows two clear patterns.
 
-Put both CEPII zip files in the top folder of your Google Drive (`My Drive`).
+**Failure 1: steady flows hit by a sudden shock from the buyer.** The watch list catches 41% of collapses among the jumpiest third of flows, but only 0.4% among the steadiest third, even though steady flows still collapse about 10% of the time. When missed collapses are compared with caught ones:
+* missed collapses are much more often steady flows (21% vs 0.3%);
+* they are milder falls (median −43% vs −69%);
+* in 26% of them, the buying country's total imports fell by more than 10% in the year being predicted, compared with 15% for flows in general.
 
-## 4. How to reproduce
+That shock happens in the year being predicted, so no input could have shown it in advance. The model relies heavily on a flow's own past, and a steady past says "safe". Faster information about the buyer (monthly trade data, currency or credit stress) or a separate model for steady flows could help.
 
-Both notebooks run on Google Colab (scikit-learn, XGBoost, pandas and matplotlib are already installed there).
+**Failure 2: "lumpy" products crowd the watch list.** Fuel, gems and gold, aircraft, ships and arms are sold in a few huge one-off deals, so their values swing wildly. They are only 4% of all flows but 12% of the watch list. Many of these warnings are correct, but they push other flows off the list, and a warning that "an aircraft sale will not repeat" is rarely useful. The website marks these products and lets visitors hide them.
 
-1. Open `notebooks/export_collapse_full.ipynb` in Colab and choose **Runtime → Run all**.
-   It builds the table from the raw BACI zip (10-20 minutes the first time; it saves `my_india_hs2.csv` and `my_world_imports_hs2.csv` to Drive so later runs take seconds), then runs the walk-forward and frozen tests.
-   Check numbers: grid 591,060 rows; final table **131,550 rows**, collapse share **0.219**; average AUC rule 0.694, boosted trees 0.730-0.731.
-2. Open `notebooks/analysis_and_website_data.ipynb` and run all. It rebuilds the out-of-sample predictions, the bootstrap, the ablation, the error analysis and the 2025 watch list, and writes `summary.json`, `watchlist_2025.json` and `past_watchlists.json` to `My Drive/website_data`.
-3. Copy those three files into `docs/data/`. To preview the site locally: `python3 -m http.server 8000 --directory docs`, then open http://localhost:8000.
+**Big flows.** For flows over $100M, the model is no better than the volatility rule (AUC 0.753 vs 0.752). Both do well on big flows, but the simple rule is already as good there. The model adds most of its value on small and medium flows, which are about 90% of all flows.
 
-The website and this README use one run of the notebooks; the saved Colab outputs in `notebooks/` come from a second run with slightly different library versions, so a few numbers differ in the third decimal (for example 4,417 vs 4,408 collapses caught, trees AUC 0.730 vs 0.731). The conclusions are the same. All models use `random_state=0`. Model settings were fixed in advance and are the same for every test year; the 2021-2024 years were not used for any choice.
+## 8. Limitations
 
-## 5. Repository structure
+* The improvement over a simple rule is real but modest (about 0.04 AUC), and about half of the model's correct warnings are flows the volatility rule also flags.
+* The model cannot foresee shocks that leave no trace in past trade, such as bans, wars, sanctions or sudden policy changes.
+* The 2-digit product groups are broad. "Machinery" mixes very different goods, and a collapse in one part can be hidden by growth in another.
+* The 26% cut-off is a choice. A different cut-off would ask a slightly different question.
+* In real use, a year's trade data is published with a delay, so warnings would arrive later than in this test.
+* The years 2011-2020 were used both to develop the project and to report results. Settings were fixed in advance, but the frozen 2021-2024 test is the cleanest result.
+* The model is built and tested only on India's exports.
+
+## 9. The website
+
+The website presents the whole project section by section, with interactive charts. It has two tools:
+
+* **2025 watch list:** the final model scores India's 2024 flows to predict collapses in 2025. You can pick a country or product group and see each flow's risk together with the three inputs that pushed its risk up most.
+* **Check a past year:** pick any year from 2011 to 2024 and see what the watch list would have said, and what really happened to each flow.
+
+## 10. Where the numbers come from
+
+Every number in this README and on the website was produced by running the code in the two notebooks in `notebooks/`. Nothing was typed in by hand. The notebooks are saved with their outputs, so they can be opened directly on GitHub to see each result printed under the code that produced it:
+
+* `export_collapse_full.ipynb`, **Steps 1-8**: building the data table, with the check numbers.
+* `export_collapse_full.ipynb`, **Step 11**: the walk-forward results (2011-2020) for the volatility rule, logistic regression, boosted trees and XGBoost.
+* `export_collapse_full.ipynb`, **Step 12**: the frozen post-COVID results, year by year from 2021 to 2024.
+* `analysis_and_website_data.ipynb`, **Step 4**: random guessing, the jump rule, the year-by-year scores and the bootstrap check.
+* `analysis_and_website_data.ipynb`, **Steps 5-7**: which inputs help, the error analysis and the 2025 watch list.
+
+The website's charts and tables read their numbers from the files in `docs/data/`, which the second notebook writes.
+
+**A note on small differences:** the website and this README use one run of the notebooks. The outputs saved inside `notebooks/` come from a second run on Google Colab with slightly different library versions, so a few numbers differ in the third decimal place (for example 4,417 instead of 4,408 collapses caught, and a boosted-trees AUC of 0.730 instead of 0.731). The conclusions are exactly the same.
+
+## 11. How to run it yourself
+
+Both notebooks run on Google Colab, which already has all the required libraries.
+
+1. Download the two CEPII zip files into your Google Drive. Open `notebooks/export_collapse_full.ipynb` in Colab and click **Runtime → Run all**. It builds the data table and tests all the models. The first run takes 10-20 minutes because it reads the large BACI file; it then saves smaller files to your Drive, so later runs take a few minutes. You should see **131,550 rows**, a collapse share of **0.219**, and an average AUC of about 0.69 for the volatility rule and 0.73 for boosted trees.
+2. Open `notebooks/analysis_and_website_data.ipynb` and run all. It produces the error analysis, the bootstrap check, the 2025 watch list and the website's data files (saved in `My Drive/website_data`).
+3. To update the website, copy those three files into `docs/data/`.
+
+All models use a fixed random seed (0), so running them again gives the same results on the same library versions.
+
+## 12. What's in this repository
 
 ```
-├── README.md
-├── requirements.txt
+├── README.md                               # this file
+├── requirements.txt                        # Python packages used
 ├── notebooks/
-│   ├── export_collapse_full.ipynb          # raw BACI -> table (Steps 1-8), models and tests (Steps 9-14)
-│   └── analysis_and_website_data.ipynb     # bootstrap, ablation, error analysis, 2025 watch list, website JSON
-└── docs/                                   # GitHub Pages website
+│   ├── export_collapse_full.ipynb          # builds the data table, trains and tests all models
+│   └── analysis_and_website_data.ipynb     # error analysis, bootstrap, 2025 watch list, website data
+└── docs/                                   # the website (GitHub Pages)
     ├── index.html, style.css, app.js
-    └── data/                               # JSON written by the second notebook
+    └── data/                               # small result files made by the second notebook
 ```
 
-## 6. Method summary
-
-* **Preprocessing:** India's exports and every country's imports summed from 6-digit products to 96 HS 2-digit groups; every buyer-product pair filled with zeros for missing years (so full stops are visible); values on a log scale and changes as log changes; flows under $1M dropped.
-* **24 inputs:** flow history (7), market (6), country and gravity (8), co-movement of India's other flows (3). All known at the end of year t.
-* **Baselines:** random, and the volatility rule (rank by the spread of the last 5 yearly changes).
-* **Models:** logistic regression (median imputation and scaling inside a pipeline), scikit-learn HistGradientBoosting (main), XGBoost (comparison, and SHAP reasons for the 2025 watch list).
-* **Evaluation:** walk-forward by year; frozen post-COVID test; AUC, top-10% hit rate, PR-AUC, Brier score; country-level bootstrap.
-
-## 7. AI-use disclosure
+## 13. AI-use disclosure
 
 * An AI assistant (Claude, by Anthropic) was used throughout the project: to plan it, to explain each step, and to write most of the code, the website and this README.
 * I built the first part of the data table myself in my own Colab notebook, following the assistant's step-by-step instructions and checking each step against fixed check numbers. The final notebooks in `notebooks/` were written by the assistant and run by me.
 * All code was run, and every number reported comes from that code. I reviewed the AI-written code and text and I am responsible for the content.
 
-## 8. Citations
+## 14. Citations
 
 * Gaulier, G. and Zignago, S. (2010). BACI: International Trade Database at the Product-Level. The 1994-2007 Version. CEPII Working Paper 2010-23.
 * Conte, M., Cotterlaz, P. and Mayer, T. (2022). The CEPII Gravity Database. CEPII Working Paper 2022-05.
