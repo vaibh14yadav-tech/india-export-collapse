@@ -41,7 +41,7 @@ The raw files are too large to store on GitHub, so this repository only contains
 2. **Fill in the missing years with zero.** BACI only lists trades that happened. If India stopped selling a product to a country, that row simply disappears. Without filling these gaps, the worst collapses (complete stops) would be invisible. After filling, there are **591,060** rows for 19,702 country-product pairs, and 31% of them are zero years.
 3. **Work with changes on a log scale.** Trade values range from $1 million to tens of billions, so values are put on a log scale and yearly changes are measured as log changes. A log change of −0.3 means a fall of about 26%, and rises and falls of the same size become symmetric.
 4. **Add the other data.** Each row gets the buying country's GDP and population from the World Bank, and distance, language, border and trade-agreement facts from the Gravity file.
-5. **Keep only meaningful flows.** I drop flows smaller than $1 million in a year, because tiny shipments jump up and down randomly and would add noise. I also drop rows whose next year is not known yet.
+5. **Keep only meaningful flows.** I drop flows smaller than $1 million in a year, because tiny shipments jump up and down randomly and would add noise. I also drop rows whose next year is not known yet, and rows where India sold nothing to that buyer the year before (this year's change cannot be computed). So brand-new and restarting flows are outside the scope of the model: it only scores flows that traded in both of the last two years.
 
 The final table has **131,550 rows**, covering data years 1996 to 2023, and **21.9%** of them collapse the following year.
 
@@ -50,10 +50,11 @@ The final table has **131,550 rows**, covering data years 1996 to 2023, and **21
 * At every step the notebook prints check numbers (for example, India's total exports in 2015 and the value of one specific flow) to make sure each step worked as intended.
 * The World Bank often has not yet published GDP for the latest year, so that value is left blank. The models are able to handle blanks.
 * The Gravity file ends in 2021, so later years reuse the last known values. Distance and language do not change, so this matters very little.
+* **Country-code changes show up as fake stops.** When a country code is retired in BACI, its flows drop to zero and are counted as complete stops. For example, the Netherlands Antilles was dissolved in 2010, so its 2010 flows count as 2011 collapses, and three of them are on the 2011 watch list. Serbia and Montenegro (split in 2006) affects only training years. These cases are few and were not removed.
 
 ## 3. What the model looks at, and why each input was chosen
 
-Every input was chosen **before testing**, from a simple economic idea of why a trade flow might fall. I did not search through hundreds of possible inputs to find the ones that happened to score best, because that can produce patterns that are just luck. All 24 inputs use only information available at the end of the year.
+Every input was chosen from a simple economic idea of why a trade flow might fall. The one data-driven check was the number of past yearly changes (3, 5 or 7), done on the walk-forward years 2011-2020 in an exploratory run that is not saved in this repository; the frozen 2021-2024 years were never used for it. I did not search through hundreds of possible inputs to find the ones that happened to score best, because that can produce patterns that are just luck. All 24 inputs use only information available at the end of the year.
 
 **The flow's own history (7 inputs).** The best guide to a flow's future is often its own past.
 
@@ -107,7 +108,7 @@ A model is only useful if it beats simple rules that anyone could apply. So the 
 | **Volatility rule** | Ranks flows by how much they have swung over the last 5 years. No learning involved | The main baseline. It is the first thing a trade analyst would try, and any model must beat it to be worth using |
 | **Jump rule** | Ranks flows by how much they rose this year | A second simple baseline, because many of the riskiest flows turn out to be ones that just jumped |
 | **Logistic regression** | Adds up the inputs with learned weights and turns the sum into a probability. Blanks are filled with the median and every input is standardised (mean 0, spread 1) inside a pipeline, so the scaling is learned from the training years only | A simple, readable model. It cannot capture combinations such as "jumpy *and* the buyer is shrinking" |
-| **Boosted trees** (scikit-learn HistGradientBoosting) | Builds 300 small decision trees, each one correcting the mistakes of the trees before it | **The main model.** It handles skewed values, blanks and combinations of inputs without extra work. No scaling is needed, because a tree split like "volatility above 0.4" works the same at any scale |
+| **Boosted trees** (scikit-learn HistGradientBoosting) | Builds up to 300 small decision trees, each one correcting the mistakes of the trees before it. scikit-learn's default early stopping is on (training sets are over 10,000 rows): it holds back a random 10% of the *training* rows and stops adding trees when they stop helping there. The test year is never involved | **The main model.** It handles skewed values, blanks and combinations of inputs without extra work. No scaling is needed, because a tree split like "volatility above 0.4" works the same at any scale |
 | **XGBoost** | The same idea as boosted trees, from a different library | A check that the result does not depend on one library. It is also used for the 2025 watch list because it can show the reasons behind each warning |
 
 The model settings (number of trees, learning rate and so on) were fixed in advance to sensible standard values and were never tuned on the test years.
@@ -220,7 +221,7 @@ The website's charts and tables read their numbers from the files in `docs/data/
 
 **A note on differences between runs:** the website and this README use one run of the notebooks. The outputs saved inside `notebooks/` come from a second run on Google Colab with slightly different library versions. Overall averages differ only in the third decimal (for example 4,417 instead of 4,408 collapses caught, boosted-trees AUC 0.730 instead of 0.731), but single-year watch-list hit rates can differ by up to about 2 points. This changes one count: the model beats the jump rule's watch list in 11 of 14 years in the site's run and 13 of 14 in the saved notebooks. The main conclusions are the same. The two small-tree baselines and the spike numbers come from `notebooks/extra_baselines.py`, run on the same table.
 
-**Fix after submission review:** CEPII's current Gravity zip contains more than one CSV, so the notebook now picks `Gravity_V202211.csv` by name instead of taking the first CSV.
+**Note on the Gravity file:** CEPII's current Gravity zip contains more than one CSV, so the notebook now picks `Gravity_V202211.csv` by name instead of taking the first CSV.
 
 ## 11. How to run it yourself
 
