@@ -23,12 +23,15 @@ Walk-forward test (answer years 2011-2020, retrained every year) and frozen post
 | Method | AUC 2011-20 | Top-10% hit rate 2011-20 | AUC 2021-24 (frozen) | Top-10% hit rate 2021-24 |
 |---|---|---|---|---|
 | Random picking | 0.500 | 22.9% | 0.500 | 20.1% |
+| Jump rule (rank by this year's rise) | 0.617 | 52.4% | 0.601 | 46.2% |
 | Volatility rule (baseline) | 0.694 | 47.0% | 0.701 | 44.3% |
 | Logistic regression | 0.711 | 53.3% | 0.719 | 50.8% |
 | **Boosted trees (main model)** | **0.731** | **54.2%** | **0.733** | **51.4%** |
 | XGBoost | 0.735 | 54.9% | 0.735 | 51.8% |
 
 * Boosted trees beat the volatility rule in **10 of 10** walk-forward years and **4 of 4** frozen years.
+* The watch list (top 10% of flows) caught **4,408 of 18,295** collapses in 2011-2024 (24%; the volatility rule's list caught 21%).
+* For flows over $100M the gain is close to zero (AUC 0.753 vs 0.752).
 * Resampling whole countries 500 times (bootstrap), the AUC gain over the rule is **+0.037** (95% range 0.031 to 0.043) walk-forward and **+0.032** (0.024 to 0.041) frozen.
 * **Main failure mode:** steady flows hit by a sudden shock from the buyer. The watch list catches 41% of collapses among the jumpiest third of flows, but only 0.4% among the steadiest third. Lumpy products (fuel, gems, aircraft, ships, arms) are 4% of flows but 12% of the watch list.
 
@@ -79,9 +82,8 @@ All models use `random_state=0`. Model settings were fixed in advance and are th
 
 ## 7. AI-use disclosure
 
-<!-- Check this section and edit it so it is exactly true for your project. -->
-* An AI assistant (Claude, by Anthropic) was used to plan the project, explain each step, write and test parts of the code, and draft the website text and this README.
-* The data table was built step by step in my own Colab notebook, and every step was checked against fixed check numbers.
+* An AI assistant (Claude, by Anthropic) was used throughout the project: to plan it, to explain each step, and to write most of the code, the website and this README.
+* I built the first part of the data table myself in my own Colab notebook, following the assistant's step-by-step instructions and checking each step against fixed check numbers. The final notebooks in `notebooks/` were written by the assistant and run by me.
 * All code was run, and every number reported comes from that code. I reviewed the AI-written code and text and I am responsible for the content.
 
 ## 8. Citations
