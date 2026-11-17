@@ -293,7 +293,7 @@
     <div class="muted small">All out-of-sample flows 2011-2024, split into 10 equal groups by risk. On the dashed line, a 40% risk would mean 40% really collapse.</div>
     <div class="chart" id="chart-calib"></div>
   </div>
-  <p id="calib-text">The riskiest tenth of flows had an average risk of <b>55%</b> and <b>54%</b> really collapsed; the safest tenth had 5% and 7%. The largest gap between predicted and real rates in any group is 2.3 points, and the Brier score is 0.153. So the scores are roughly honest percentages, though they were not adjusted (calibrated) after training.</p>
+  <p id="calib-text">The riskiest tenth of flows had an average risk of <b>55%</b> and <b>54%</b> really collapsed; the safest tenth had 5% and 7%. The largest gap between predicted and real rates in any group is 2.3 points, and the Brier score is 0.153. In <b>9 of 10</b> groups more flows really collapsed than predicted, so the scores run slightly low. They are close to real rates, but they were not adjusted (calibrated) after training and are best read as a ranking with roughly the right scale.</p>
   <h3>Is the model just finding the obvious?</h3>
   <p id="obvious-text">Partly, yes. Of the collapses the watch list caught, <b>56%</b> were also on the volatility rule's list. Most of the other <b>44%</b> were flows that had jumped sharply that year, which the jump rule or a small tree on the flow's own history would also flag. <b>93%</b> of the caught flows had <i>not</i> already fallen that year, so the model is not just saying "it fell, so it will fall again"; much of what it catches is "it jumped, so it will fall back". The buyer, country and co-movement inputs add only a small extra gain (see Stronger simple baselines).</p>
 </section>
@@ -375,7 +375,7 @@
     27% of all collapses end at or above the level of two years earlier (they only undo that year's jump), and 30% came right after the flow at least doubled.
     So the label mixes real lost markets with jumps falling back, and much of the watch list is the second kind. A target measured against a 3-year average would separate them; I leave that for future work.</li>
     <li><b>2024 GDP is carried forward.</b> 2024 GDP was not yet published, so the 2025 list uses each country's latest known GDP (64 of 6,487 flows still have none). This is an approximation.</li>
-    <li><b>Risk scores were checked but not adjusted.</b> In every tenth of flows by risk, the real collapse rate is within about 2.3 points of the average predicted risk (see the calibration chart), but no calibration step was applied after training.</li>
+    <li><b>Risk scores run slightly low.</b> In every tenth of flows by risk, the real collapse rate is within about 2-3 points of the average predicted risk, but in 9 of 10 groups it is higher than predicted (see the calibration chart). No calibration step was applied after training.</li>
     <li><b>Blind to new shocks.</b> Bans, wars, sanctions and sudden policy changes leave no trace in past trade, so steady flows hit by them are missed.</li>
     <li><b>2-digit product groups are coarse.</b> "Machinery" mixes very different goods; a collapse in one part can be hidden by growth in another.</li>
     <li><b>The 26% cut-off is a choice.</b> A different line gives a different question. The table also keeps a stricter target (the flow halves or stops), left for future work.</li>

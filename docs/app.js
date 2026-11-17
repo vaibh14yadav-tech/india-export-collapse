@@ -307,7 +307,8 @@
       document.getElementById("calib-text").innerHTML =
         `The riskiest tenth of flows had an average risk of <b>${pct(top.mean_risk)}</b> and <b>${pct(top.real_rate)}</b> really collapsed; the safest tenth had ${pct(low.mean_risk)} and ${pct(low.real_rate)}. ` +
         `The largest gap between predicted and real rates in any group is ${(maxGap * 100).toFixed(1)} points, and the Brier score is ${C.brier.toFixed(3)}. ` +
-        (maxGap < 0.05 ? `So the scores are roughly honest percentages, though they were not adjusted (calibrated) after training.` : `So the scores rank flows well but should not be read as exact percentages.`);
+        `In <b>${bins.filter((b) => b.real_rate > b.mean_risk).length} of ${bins.length}</b> groups more flows really collapsed than predicted, so the scores run slightly low. ` +
+        `They are close to real rates, but they were not adjusted (calibrated) after training and are best read as a ranking with roughly the right scale.`;
     }
 
     table("ablation-table", [{ t: "Inputs used", k: "i" }, { t: "Number", k: "n", n: 1 }, { t: "AUC 2011-20", k: "a", n: 1 }],
