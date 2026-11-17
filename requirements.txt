@@ -1,6 +1,7 @@
-pandas
-numpy
-scikit-learn
-xgboost
-matplotlib
-# Results were produced on Google Colab (November 2026); other versions can change the third decimal.
+# Versions of the run behind the website and README numbers.
+# The saved notebook outputs were produced on Google Colab (November 2026), whose versions differed slightly.
+pandas==3.0.5
+numpy==2.5.3
+scikit-learn==1.9.1
+xgboost==3.4.1
+matplotlib==3.11.2

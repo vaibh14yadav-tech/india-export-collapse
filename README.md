@@ -50,7 +50,7 @@ The final table has **131,550 rows**, covering data years 1996 to 2023, and **21
 * At every step the notebook prints check numbers (for example, India's total exports in 2015 and the value of one specific flow) to make sure each step worked as intended.
 * The World Bank often has not yet published GDP for the latest year, so that value is left blank. The models are able to handle blanks.
 * The Gravity file ends in 2021, so later years reuse the last known values. Distance and language do not change, so this matters very little.
-* **Country-code changes show up as fake stops.** When a country code is retired in BACI, its flows drop to zero and are counted as complete stops. For example, the Netherlands Antilles was dissolved in 2010, so its 2010 flows count as 2011 collapses, and three of them are on the 2011 watch list. Serbia and Montenegro (split in 2006) affects only training years. These cases are few and were not removed.
+* **Country-code changes show up as fake stops.** When a country code is retired in BACI, its flows drop to zero and are counted as complete stops. For example, the Netherlands Antilles was dissolved in 2010, so its 2010 flows count as 2011 collapses, and three of them are on the 2011 watch list. The largest case is the Southern African Customs Union (SACU): BACI reports it as one buyer until 1999 and its countries separately after, so 47 SACU flows count as stops in 1999. This and Serbia and Montenegro (split in 2006) affect only training years. These cases are few and were not removed.
 
 ## 3. What the model looks at, and why each input was chosen
 
@@ -161,7 +161,7 @@ COVID disrupted world trade, so I also check whether a model built on the pre-CO
 | Tree on the flow's own history (7 inputs) | 0.722 | 53.5% | 0.727 | 50.7% |
 | Full model (24 inputs) | 0.731 | 54.2% | 0.733 | 51.4% |
 
-Most of the skill comes from the flow's own history: even 2 inputs beat the volatility rule. The other 17 inputs add a real but small gain (about +0.006 to +0.009 AUC, under 1 point on the watch list).
+Most of the skill comes from the flow's own history: even 2 inputs beat the volatility rule. The other 17 inputs add a real but small gain in AUC (about +0.006 to +0.009). On the watch list they add almost nothing: under 1 point in 2011-2020, and about zero on the frozen test when all rows come from one run (the full-model row above is from the website's run, the small trees from `extra_baselines.py`).
 
 **What these results show:**
 
@@ -220,6 +220,8 @@ Every number in this README and on the website was produced by running the code 
 The website's charts and tables read their numbers from the files in `docs/data/`, which the second notebook writes.
 
 **A note on differences between runs:** the website and this README use one run of the notebooks. The outputs saved inside `notebooks/` come from a second run on Google Colab with slightly different library versions. Overall averages differ only in the third decimal (for example 4,417 instead of 4,408 collapses caught, boosted-trees AUC 0.730 instead of 0.731), but single-year watch-list hit rates can differ by up to about 2 points. This changes one count: the model beats the jump rule's watch list in 11 of 14 years in the site's run and 13 of 14 in the saved notebooks. The main conclusions are the same. The two small-tree baselines and the spike numbers come from `notebooks/extra_baselines.py`, run on the same table.
+
+**Package versions:** `requirements.txt` pins the versions of the run behind the website and this README. The saved notebook outputs came from Google Colab's versions at the time, which explains the small differences above.
 
 **Note on the Gravity file:** CEPII's current Gravity zip contains more than one CSV, so the notebook now picks `Gravity_V202211.csv` by name instead of taking the first CSV.
 
