@@ -109,6 +109,8 @@
     completely would just vanish, and the worst collapses would never be in the data.</li>
     <li><b>Only flows of $1M or more.</b> Tiny flows jump around randomly; a $20,000 shipment doubling or vanishing is noise, not a signal.</li>
     <li><b>Check numbers</b> were compared at every step (e.g. India's 2015 exports total $278.8bn in BACI; the Nigeria medicines flow in 2015 is $338.7M).</li>
+    <li><b>New and restarting flows are not scored.</b> Rows where India sold nothing to that buyer the year before are dropped, because this year's change cannot be computed. The model only scores flows that traded in both of the last two years.</li>
+    <li><b>Retired country codes look like stops.</b> When a country code ends in BACI, its flows fall to zero. The Netherlands Antilles was dissolved in 2010, so three of its flows appear on the 2011 watch list as "caught" collapses. These cases are few and were not removed.</li>
     <li><b>Gaps:</b> World Bank GDP for the latest year is often not published yet, so it is left blank and the models handle blanks.
     The Gravity file ends in 2021, so later years carry the last known value forward (distance and language do not change).</li>
   </ul>
@@ -126,7 +128,7 @@
   <p>Trade values are hugely skewed ($1M next to $10bn), so values are put on a <b>log scale</b>, and
   changes are <b>log changes</b> (log of this year minus log of last year). A log change of −0.3 means a fall of about 26%,
   and rises and falls of the same size become symmetric.</p>
-  <p>Every input was chosen <b>before testing</b>, from a simple economic idea of why a trade flow might fall.
+  <p>Every input was chosen from a simple economic idea of why a trade flow might fall. The one data-driven check was the number of past yearly changes (3, 5 or 7), done on the walk-forward years 2011-2020 only.
   I did not search through hundreds of possible inputs to find the ones that happened to score best, because that can produce patterns that are just luck.</p>
   <h3>The flow's own history (7 inputs)</h3>
   <p class="muted">The best guide to a flow's future is often its own past.</p>
@@ -187,7 +189,7 @@
     <tr><td><b>Jump rule</b></td><td>Ranks flows by this year's change, biggest rise first. No learning.</td><td>A second simple baseline: many of the riskiest flows are ones that just jumped, so I check whether this alone does as well.</td></tr>
     <tr><td><b>Volatility rule</b></td><td>Ranks flows by their volatility (how much they swung over the last 5 years). No learning.</td><td>The honest baseline: the first thing a trade analyst would try. Any model must beat this to be worth it.</td></tr>
     <tr><td><b>Logistic regression</b></td><td>A weighted sum of the inputs, turned into a probability (L2 penalty, C = 1). Blanks are filled with the median and every input is standardised (mean 0, spread 1) inside a pipeline, so the scaling is learned from training years only.</td><td>Simple, readable, but cannot see interactions (e.g. "jumpy <i>and</i> the buyer is shrinking").</td></tr>
-    <tr><td><b>Boosted trees</b> (scikit-learn HistGradientBoosting)</td><td>300 small trees, each fixing the mistakes of the ones before (learning rate 0.05).</td><td>Main model. Handles skewed inputs, blanks and interactions without hand-made features. No scaling is needed: a split like "volatility above 0.4" works the same at any scale.</td></tr>
+    <tr><td><b>Boosted trees</b> (scikit-learn HistGradientBoosting)</td><td>Up to 300 small trees, each fixing the mistakes of the ones before (learning rate 0.05). scikit-learn's default early stopping holds back 10% of the <i>training</i> rows and stops adding trees when they stop helping; the test year is never involved.</td><td>Main model. Handles skewed inputs, blanks and interactions without hand-made features. No scaling is needed: a split like "volatility above 0.4" works the same at any scale.</td></tr>
     <tr><td><b>XGBoost</b></td><td>The same idea from another library (300 trees, depth 5, learning rate 0.05).</td><td>A check that the result is not one library's quirk. Also gives exact per-input reasons (SHAP).</td></tr>
   </table></div>
   <p>Boosted trees are the main model for all test results, including the "Check a past year" tool. XGBoost was tested in exactly the same way (AUC 0.735 vs 0.731).
