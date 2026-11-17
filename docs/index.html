@@ -46,6 +46,7 @@
   <div class="kicker">In brief</div>
   <h2>The answer in brief</h2>
   <ul>
+    <li><b>Watch list:</b> each year the model gives every flow a risk score from 0 to 1. The 10% of flows with the highest scores form the <b>watch list</b>: the short list someone should check first. Its <b>hit rate</b> is the share of the list that really collapsed.</li>
     <li><b>Question:</b> using only what is known at the end of a year, can I tell which of India's export flows (one product group to one country) will fall by more than about a quarter, or stop, the next year?</li>
     <li><b>Data:</b> 131,550 flows (206 countries, 96 product groups, 1996-2023), built from CEPII BACI trade data, CEPII Gravity and World Bank GDP and population.</li>
     <li><b>Key fact about the data:</b> about 22% of flows collapse the next year, and a simple rule that flags the jumpiest flows already does well (AUC 0.69). That rule is the bar the model has to clear.</li>
@@ -64,7 +65,7 @@
     <div class="step"><b>One row</b>India's exports of one product group (2-digit HS code, e.g. "30 Pharmaceuticals") to one country in one year.</div>
     <div class="step"><b>Target: collapse</b>Next year's value falls by more than 26% (log change below −0.3) or drops to zero.</div>
     <div class="step"><b>Prediction time</b>End of year t. Every input uses year t or earlier. Next year's numbers are never used. In real use, year-t trade data is published with a delay, so the warning would arrive later than this.</div>
-    <div class="step"><b>Output</b>A risk score from 0 to 1 for each flow, and a watch list of the 10% riskiest.</div>
+    <div class="step"><b>Output</b>A risk score from 0 to 1 for each flow. Sorting all flows by risk and taking the top 10% gives the <b>watch list</b>: the flows to check first, because a real team cannot check every flow.</div>
   </div>
   <div class="card" id="calc">
     <div class="title">Try it: would this count as a collapse?</div>
