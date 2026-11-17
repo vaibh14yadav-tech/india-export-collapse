@@ -256,7 +256,7 @@ All models use a fixed random seed (0), so running them again gives the same res
 ## 13. AI-use disclosure
 
 * An AI assistant (Claude, by Anthropic) was used throughout the project: to plan it, to explain each step, and to write most of the code, the website and this README.
-* I built the first part of the data table myself in my own Colab notebook, following the assistant's step-by-step instructions and checking each step against fixed check numbers. The final notebooks in `notebooks/` were written by the assistant and run by me.
+* I built the first part of the data table myself in my own Colab notebook, following the assistant's step-by-step instructions and checking each step against fixed check numbers. The final notebooks in `notebooks/` were written by the assistant. I ran both of them in Colab, and the outputs saved in `notebooks/` are from my runs. The assistant ran the same notebooks separately to produce the website's data files and the numbers in this README; the two runs differ only slightly (see section 10).
 * All code was run, and every number reported comes from that code. I reviewed the AI-written code and text and I am responsible for the content.
 
 ## 14. Citations
