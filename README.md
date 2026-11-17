@@ -152,6 +152,16 @@ COVID disrupted world trade, so I also check whether a model built on the pre-CO
 | **Boosted trees (main model)** | **0.731** | **54.2%** | **0.733** | **51.4%** |
 | XGBoost | 0.735 | 54.9% | 0.735 | 51.8% |
 
+**Stronger simple baselines.** To check whether all 24 inputs are needed, I also ran two small trees with the same tests:
+
+| Method | AUC, walk-forward 2011-20 | Watch list right, 2011-20 | AUC, frozen 2021-24 | Watch list right, 2021-24 |
+|---|---|---|---|---|
+| Tree on 2 inputs (this year's change + volatility) | 0.712 | 52.8% | 0.712 | 48.5% |
+| Tree on the flow's own history (7 inputs) | 0.722 | 53.5% | 0.727 | 50.7% |
+| Full model (24 inputs) | 0.731 | 54.2% | 0.733 | 51.4% |
+
+Most of the skill comes from the flow's own history: even 2 inputs beat the volatility rule. The other 17 inputs add a real but small gain (about +0.006 to +0.009 AUC, under 1 point on the watch list).
+
 **What these results show:**
 
 * **The model beats the main baseline in every year.** Boosted trees score higher than the volatility rule in all 10 walk-forward years and in all 4 frozen post-COVID years. The model still works after COVID without retraining.
@@ -182,7 +192,10 @@ That shock happens in the year being predicted, so no input could have shown it 
 * The model cannot foresee shocks that leave no trace in past trade, such as bans, wars, sanctions or sudden policy changes.
 * The 2-digit product groups are broad. "Machinery" mixes very different goods, and a collapse in one part can be hidden by growth in another.
 * The 26% cut-off is a choice. A different cut-off would ask a slightly different question.
-* In real use, a year's trade data is published with a delay, so warnings would arrive later than in this test.
+* **Many collapses are spikes falling back.** A collapse is measured against this year's value, so a flow that jumps 4× and gives back a quarter counts. 27% of all collapses end at or above the level of two years earlier, and 30% came right after the flow at least doubled. Much of the watch list is this kind of flow. A target measured against a 3-year average would separate real lost markets from jumps falling back.
+* **The 2025 list uses blank GDP.** 2024 GDP was not yet published, so both GDP inputs are blank for every 2024 flow, while they are almost always filled in training. This can push 2025 scores up, so the 2025 list is best read as a ranking. Carrying 2023 GDP forward would fix it.
+* **Risk scores are not calibrated.** A score of 70% means "high on the ranking", not an exact probability.
+* **Timing.** BACI data for a year is published about 13 months after the year ends, so in real use a warning would arrive after most of the next year has passed, and the "2025 watch list" describes a year that has already ended.
 * The years 2011-2020 were used both to develop the project and to report results. Settings were fixed in advance, but the frozen 2021-2024 test is the cleanest result.
 * The model is built and tested only on India's exports.
 
@@ -205,7 +218,9 @@ Every number in this README and on the website was produced by running the code 
 
 The website's charts and tables read their numbers from the files in `docs/data/`, which the second notebook writes.
 
-**A note on small differences:** the website and this README use one run of the notebooks. The outputs saved inside `notebooks/` come from a second run on Google Colab with slightly different library versions, so a few numbers differ in the third decimal place (for example 4,417 instead of 4,408 collapses caught, and a boosted-trees AUC of 0.730 instead of 0.731). The conclusions are exactly the same.
+**A note on differences between runs:** the website and this README use one run of the notebooks. The outputs saved inside `notebooks/` come from a second run on Google Colab with slightly different library versions. Overall averages differ only in the third decimal (for example 4,417 instead of 4,408 collapses caught, boosted-trees AUC 0.730 instead of 0.731), but single-year watch-list hit rates can differ by up to about 2 points. This changes one count: the model beats the jump rule's watch list in 11 of 14 years in the site's run and 13 of 14 in the saved notebooks. The main conclusions are the same. The two small-tree baselines and the spike numbers come from `notebooks/extra_baselines.py`, run on the same table.
+
+**Fix after submission review:** CEPII's current Gravity zip contains more than one CSV, so the notebook now picks `Gravity_V202211.csv` by name instead of taking the first CSV.
 
 ## 11. How to run it yourself
 
