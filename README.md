@@ -12,7 +12,7 @@ India exports almost a hundred kinds of products to more than two hundred countr
 
 This project asks one question:
 
-> **Using only what is known at the end of a year, can we predict which of India's export flows will collapse in the following year?**
+> **Using only what is known at the end of a year, is it possible to predict which of India's export flows will collapse in the following year?**
 
 To make the question precise:
 
@@ -27,7 +27,7 @@ The model only predicts risk. It does not decide what anyone should do: whether 
 
 ### Where it comes from
 
-| Source | What we use from it | How to get it |
+| Source | What I use from it | How to get it |
 |---|---|---|
 | **CEPII BACI** (HS92, version 202601) | Every country's trade with every other country, product by product, for 1995-2024, in thousands of US dollars | Free download from the CEPII website (BACI page). File: `BACI_HS92_V202601.zip`, about 2.4 GB |
 | **CEPII Gravity** (version 202211) | Facts about each pair of countries: distance, shared border, shared language, WTO membership, trade agreements | Free download from the CEPII website (Gravity page). File: `Gravity_csv_V202211.zip` |
@@ -37,11 +37,11 @@ The raw files are too large to store on GitHub, so this repository only contains
 
 ### How the raw data becomes the final table
 
-1. **Read 30 years of BACI.** For every year, we keep India's exports to each country, and each country's total imports from the whole world. Products are grouped from 6-digit codes into the 96 two-digit product groups. This gives **405,322** India export records.
+1. **Read 30 years of BACI.** For every year, I keep India's exports to each country, and each country's total imports from the whole world. Products are grouped from 6-digit codes into the 96 two-digit product groups. This gives **405,322** India export records.
 2. **Fill in the missing years with zero.** BACI only lists trades that happened. If India stopped selling a product to a country, that row simply disappears. Without filling these gaps, the worst collapses (complete stops) would be invisible. After filling, there are **591,060** rows for 19,702 country-product pairs, and 31% of them are zero years.
 3. **Work with changes on a log scale.** Trade values range from $1 million to tens of billions, so values are put on a log scale and yearly changes are measured as log changes. A log change of −0.3 means a fall of about 26%, and rises and falls of the same size become symmetric.
 4. **Add the other data.** Each row gets the buying country's GDP and population from the World Bank, and distance, language, border and trade-agreement facts from the Gravity file.
-5. **Keep only meaningful flows.** We drop flows smaller than $1 million in a year, because tiny shipments jump up and down randomly and would add noise. We also drop rows whose next year is not known yet.
+5. **Keep only meaningful flows.** I drop flows smaller than $1 million in a year, because tiny shipments jump up and down randomly and would add noise. I also drop rows whose next year is not known yet.
 
 The final table has **131,550 rows**, covering data years 1996 to 2023, and **21.9%** of them collapse the following year.
 
@@ -53,7 +53,7 @@ The final table has **131,550 rows**, covering data years 1996 to 2023, and **21
 
 ## 3. What the model looks at, and why each input was chosen
 
-Every input was chosen **before testing**, from a simple economic idea of why a trade flow might fall. We did not search through hundreds of possible inputs to find the ones that happened to score best, because that can produce patterns that are just luck. All 24 inputs use only information available at the end of the year.
+Every input was chosen **before testing**, from a simple economic idea of why a trade flow might fall. I did not search through hundreds of possible inputs to find the ones that happened to score best, because that can produce patterns that are just luck. All 24 inputs use only information available at the end of the year.
 
 **The flow's own history (7 inputs).** The best guide to a flow's future is often its own past.
 
@@ -61,7 +61,7 @@ Every input was chosen **before testing**, from a simple economic idea of why a 
 |---|---|---|
 | Size | The flow's value that year (on a log scale) | Big, established flows are usually more stable than small ones |
 | Change this year, last year, 2 years ago | How much the flow rose or fell in each of the last 3 years | A flow that just jumped often falls back; one that keeps falling may keep falling. Three years was enough: using 5 or 7 years of changes improved AUC by only about 0.001 |
-| Volatility | How much the flow has swung up and down over the last 5 years | Flows that swing a lot are more likely to have a big drop |
+| Volatility | How much the flow has swung up and down over the last 5 years | Flows that swing a lot are more likely to have a big drop. 5 years is a trade-off: with yearly data, fewer years gives too few numbers for a steady estimate, and more years lets old swings that no longer matter dominate. It is the same window commonly used for a stock's beta, which is often estimated from 5 years (60 months) of returns. I did not tune this window; it was fixed before testing |
 | 3-year trend | The overall change over the last 3 years | Separates a flow that is slowly shrinking from one that is growing |
 | Years traded (of last 5) | In how many of the last 5 years India sold this product to this country at all | New or on-and-off flows are fragile and stop easily |
 
@@ -106,8 +106,8 @@ A model is only useful if it beats simple rules that anyone could apply. So the 
 | **Random guessing** | Picks flows at random | The floor: its watch list is right only as often as flows collapse in general (about 23%) |
 | **Volatility rule** | Ranks flows by how much they have swung over the last 5 years. No learning involved | The main baseline. It is the first thing a trade analyst would try, and any model must beat it to be worth using |
 | **Jump rule** | Ranks flows by how much they rose this year | A second simple baseline, because many of the riskiest flows turn out to be ones that just jumped |
-| **Logistic regression** | Adds up the inputs with learned weights and turns the sum into a probability | A simple, readable model. It cannot capture combinations such as "jumpy *and* the buyer is shrinking" |
-| **Boosted trees** (scikit-learn HistGradientBoosting) | Builds 300 small decision trees, each one correcting the mistakes of the trees before it | **The main model.** It handles skewed values, blanks and combinations of inputs without extra work |
+| **Logistic regression** | Adds up the inputs with learned weights and turns the sum into a probability. Blanks are filled with the median and every input is standardised (mean 0, spread 1) inside a pipeline, so the scaling is learned from the training years only | A simple, readable model. It cannot capture combinations such as "jumpy *and* the buyer is shrinking" |
+| **Boosted trees** (scikit-learn HistGradientBoosting) | Builds 300 small decision trees, each one correcting the mistakes of the trees before it | **The main model.** It handles skewed values, blanks and combinations of inputs without extra work. No scaling is needed, because a tree split like "volatility above 0.4" works the same at any scale |
 | **XGBoost** | The same idea as boosted trees, from a different library | A check that the result does not depend on one library. It is also used for the 2025 watch list because it can show the reasons behind each warning |
 
 The model settings (number of trees, learning rate and so on) were fixed in advance to sensible standard values and were never tuned on the test years.
@@ -120,7 +120,7 @@ The usual way to test a model is to shuffle the data and hold some rows back. He
 
 ### Test 1: walk-forward test (2011-2020)
 
-We pretend to stand at the end of each year and predict the next one, ten times in a row.
+I pretend to stand at the end of each year and predict the next one, ten times in a row.
 
 * **Example.** To predict which flows collapse in **2013**, the model is trained only on rows from **2011 and earlier**, because their outcomes (what happened in 2012 and before) were already known at the end of 2012. The model is then given each flow's **2012** numbers as inputs and asked which flows will collapse in 2013. Its predictions are compared with what really happened in 2013.
 * The 2012 rows are not used for training in this step, because their outcome *is* 2013, the year being predicted. They become training data one step later, when the model predicts 2014.
@@ -128,7 +128,7 @@ We pretend to stand at the end of each year and predict the next one, ten times 
 
 ### Test 2: frozen post-COVID test (2021-2024)
 
-COVID disrupted world trade, so we also check whether a model built on the pre-COVID world still works afterwards.
+COVID disrupted world trade, so I also check whether a model built on the pre-COVID world still works afterwards.
 
 * The model is trained **once**, on all rows whose outcome was known by 2020, and then **frozen**: it is never retrained or adjusted again.
 * That same frozen model predicts 2021, 2022, 2023 and 2024. The results reported for this test are the **average over these 4 years**.
@@ -139,7 +139,7 @@ COVID disrupted world trade, so we also check whether a model built on the pre-C
 * **AUC.** Take one flow that collapsed and one that did not. AUC is how often the method gives the collapsed flow the higher risk score. 0.5 means no better than a coin flip; 1.0 would be perfect.
 * **Watch list hit rate.** Of the 10% of flows a method flags as riskiest, the share that really collapsed. This matches the real use: a team that only has time to check one flow in ten.
 * **PR-AUC and Brier score** are also calculated in the notebooks. Plain accuracy is not used, because 78% of flows do not collapse, so a model that always says "no collapse" would already be 78% accurate while being useless.
-* **Is the difference just luck?** Flows to the same country tend to move together, so we re-ran the comparison 500 times, each time on a random mix of countries (a "bootstrap"), and looked at how much the model's advantage over the volatility rule varies.
+* **Is the difference just luck?** Flows to the same country tend to move together, so I re-ran the comparison 500 times, each time on a random mix of countries (a "bootstrap"), and looked at how much the model's advantage over the volatility rule varies.
 
 ## 6. Results
 
