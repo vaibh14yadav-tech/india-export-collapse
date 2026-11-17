@@ -127,32 +127,60 @@
     hit.addEventListener("mouseleave", () => { cross.setAttribute("opacity", 0); hideTip(); });
   }
 
-  // ---------- walk-forward diagram ----------
-  function splitDiagram(container) {
-    const years = []; for (let y = 1997; y <= 2020; y++) years.push(y);
-    const rows = [2011, 2015, 2020];
-    const width = 760, cell = (width - 120) / years.length, height = rows.length * 34 + 40;
-    const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Walk-forward split diagram" });
+  // ---------- walk-forward diagram (interactive) ----------
+  function splitDiagram(container, Y, byYear) {
+    const years = []; for (let y = 1996; y <= 2023; y++) years.push(y);
+    const frozen = Y >= 2021;
+    const width = 760, left = 8, cell = (width - left - 4) / years.length, height = 74;
+    const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Which years train and test the model" });
     container.innerHTML = ""; container.appendChild(svg);
-    rows.forEach((Y, r) => {
-      const t = el("text", { x: 0, y: r * 34 + 22, class: "lbl" }, svg); t.textContent = "answer " + Y;
-      years.forEach((yr, i) => {
-        const ans = yr + 1; // a row from year yr has its answer in yr+1
-        let fill = "var(--surface-2)";
-        if (ans < Y) fill = "var(--model)";
-        if (ans === Y) fill = "var(--rule)";
-        el("rect", { x: 110 + i * cell, y: r * 34 + 8, width: cell - 2, height: 22, rx: 3, fill }, svg);
-      });
+    years.forEach((yr, i) => {
+      const ans = yr + 1; // a row from data year yr has its answer in yr+1
+      let fill = "var(--surface-2)", kind = "future: not seen";
+      if (ans < Y && (!frozen || ans <= 2020)) { fill = "var(--model)"; kind = "training data"; }
+      else if (ans < Y && frozen) { fill = "var(--risk-1)"; kind = "known, but the frozen model is not retrained on it"; }
+      if (ans === Y) { fill = "var(--rule)"; kind = "test: inputs from " + yr + ", answer in " + Y; }
+      const r = el("rect", { x: left + i * cell, y: 8, width: cell - 2, height: 30, rx: 3, fill }, svg);
+      r.addEventListener("mousemove", (e) => showTip(e, `<b>Data year ${yr}</b> (answer in ${ans})<br>${kind}`));
+      r.addEventListener("mouseleave", hideTip);
     });
-    [1997, 2005, 2010, 2015, 2019].forEach((yr) => {
-      const t = el("text", { x: 110 + (yr - 1997) * cell + cell / 2, y: rows.length * 34 + 26, "text-anchor": "middle", class: "lbl" }, svg);
-      t.textContent = yr;
+    [1996, 2000, 2005, 2010, 2015, 2020, 2023].forEach((yr) => {
+      const t = el("text", { x: left + (yr - 1996) * cell + cell / 2, y: 56, "text-anchor": "middle", class: "lbl" }, svg);
+      t.textContent = window.innerWidth < 600 ? "'" + String(yr).slice(-2) : yr;
     });
     const lg = document.createElement("div");
     lg.className = "legend";
-    lg.innerHTML = '<span><i style="background:var(--model);height:10px"></i>train rows (answer already known)</span><span><i style="background:var(--rule);height:10px"></i>test rows (data year Y−1)</span><span><i style="background:var(--surface-2);height:10px;border:1px solid var(--border)"></i>not used yet (future)</span>';
+    lg.innerHTML = '<span><i style="background:var(--model);height:10px"></i>trains the model</span><span><i style="background:var(--rule);height:10px"></i>tested on</span>' +
+      (frozen ? '<span><i style="background:var(--risk-1);height:10px"></i>known, but frozen model not retrained</span>' : "") +
+      '<span><i style="background:var(--surface-2);height:10px;border:1px solid var(--border)"></i>future, never seen</span>';
     container.appendChild(lg);
+    const d = byYear.find((r) => r.answer_year === Y);
+    const lastTrain = frozen ? 2019 : Y - 2;
+    let txt = `To predict <b>${Y}</b>, the model learns from data years <b>1996 to ${lastTrain}</b> (whose outcomes were already known) and is then given each flow's <b>${Y - 1}</b> numbers. `;
+    txt += frozen ? `This is the <b>frozen</b> test: the model was trained once, up to 2020, and never updated. ` : `This is the <b>walk-forward</b> test: the model is retrained for every year. `;
+    if (d) txt += `In ${Y} it scored <b>${d.rows.toLocaleString()}</b> flows: AUC <b>${f3(d.auc_model)}</b> vs ${f3(d.auc_rule)} for the volatility rule, and <b>${pct(d.top10_model)}</b> of its watch list really collapsed (rule: ${pct(d.top10_rule)}, random: ${pct(d.base_rate)}).`;
+    document.getElementById("wf-text").innerHTML = txt;
   }
+
+  // ---------- collapse calculator ----------
+  function calc() {
+    const a = parseFloat(document.getElementById("calc-a").value), b = parseFloat(document.getElementById("calc-b").value);
+    const out = document.getElementById("calc-out");
+    if (!(a > 0) || !(b >= 0)) { out.innerHTML = "Enter a value above 0 for this year, and 0 or more for next year."; return; }
+    let h;
+    if (b === 0) h = `The flow <b>stopped completely</b>. <span class="verdict yes">This is a collapse.</span>`;
+    else {
+      const lc = Math.log(b / a), pc = b / a - 1;
+      const yes = lc < -0.3;
+      h = `Change: <b>${pc >= 0 ? "+" : ""}${(pc * 100).toFixed(1)}%</b>, which is a log change of <b>${lc.toFixed(3)}</b>. ` +
+        (yes ? `<span class="verdict yes">This is a collapse</span> (log change below −0.3, a fall of more than about 26%).`
+             : `<span class="verdict no">Not a collapse</span>${pc < 0 ? " (the fall is smaller than about 26%)" : ""}.`);
+    }
+    if (a < 1) h += ` <span class="muted">Note: flows under $1M in the first year are left out of the table, because tiny flows jump around randomly.</span>`;
+    out.innerHTML = h;
+  }
+  ["calc-a", "calc-b"].forEach((id) => document.getElementById(id).addEventListener("input", calc));
+  calc();
 
   function table(target, head, rows, opts = {}) {
     const t = typeof target === "string" ? document.getElementById(target) : target;
@@ -174,13 +202,41 @@
     barChart(document.getElementById("chart-base"), cr.map((d) => ({ v: d.v, label: d.y, tip: `<b>Answer year ${d.y}</b><br>collapse share: <b>${pct(d.v, 1)}</b>` })),
       { height: 220, ymin: 0, ymax: 0.4, yticks: [0, 0.1, 0.2, 0.3, 0.4], fmt: (t) => pct(t), labelEvery: 4 });
 
-    splitDiagram(document.getElementById("chart-split"));
+    const sl = document.getElementById("wf-slider");
+    const drawSplit = () => { document.getElementById("wf-year").textContent = sl.value; splitDiagram(document.getElementById("chart-split"), +sl.value, byYear); };
+    sl.oninput = drawSplit; drawSplit();
 
-    lineChart(document.getElementById("chart-auc"), years, [
-      { name: "Boosted trees", color: "var(--model)", values: byYear.map((d) => d.auc_model) },
-      { name: "Volatility rule", color: "var(--rule)", values: byYear.map((d) => d.auc_rule) },
-    ], { ymin: 0.45, ymax: 0.8, yticks: [0.5, 0.6, 0.7, 0.8], fmt: f3, shadeFrom: firstFrozen, refLine: 0.5,
-         note: (i) => byYear[i].design + ", " + byYear[i].rows.toLocaleString() + " flows" });
+    const METRICS = {
+      auc: { k: "auc", ymin: 0.45, ymax: 0.8, yticks: [0.5, 0.6, 0.7, 0.8], fmt: f3, base: () => 0.5,
+        note: "AUC: if you pick one flow that collapsed and one that did not, how often does the method give the collapsed one the higher risk? 0.5 is a coin flip." },
+      top10: { k: "top10", ymin: 0, ymax: 0.7, yticks: [0, 0.2, 0.4, 0.6], fmt: (t) => pct(t), base: (d) => d.base_rate,
+        note: "Watch list hit rate: of the 10% of flows each method flags as riskiest, the share that really collapsed. Random picking only gets the collapse rate." },
+      recall: { k: "recall", ymin: 0, ymax: 0.4, yticks: [0, 0.1, 0.2, 0.3, 0.4], fmt: (t) => pct(t), base: () => 0.1, nojump: true,
+        note: "Collapses caught: of all flows that really collapsed that year, the share that were on the watch list. A random list of 10% catches about 10%. (Not computed for the jump rule.)" },
+      pr: { k: "pr", ymin: 0, ymax: 0.6, yticks: [0, 0.2, 0.4, 0.6], fmt: f3, base: (d) => d.base_rate,
+        note: "PR-AUC: how well the method keeps its warnings correct as it flags more and more flows. Random picking scores the collapse rate." },
+    };
+    let metric = document.querySelector('#metric-tabs button[aria-selected="true"]').dataset.m;
+    function drawMetric() {
+      const M = METRICS[metric], series = [];
+      const on = (id) => document.getElementById(id).checked;
+      document.getElementById("m-jump").disabled = !!M.nojump;
+      if (on("m-model")) series.push({ name: "Boosted trees", color: "var(--model)", values: byYear.map((d) => d[M.k + "_model"]) });
+      if (on("m-rule")) series.push({ name: "Volatility rule", color: "var(--rule)", values: byYear.map((d) => d[M.k + "_rule"]) });
+      if (on("m-jump") && !M.nojump) series.push({ name: "Jump rule", color: "var(--jump)", values: byYear.map((d) => d[M.k + "_jump"]) });
+      if (on("m-base")) series.push({ name: "Random picking", color: "var(--base)", values: byYear.map((d) => M.base(d)) });
+      lineChart(document.getElementById("chart-auc"), years, series,
+        { ymin: M.ymin, ymax: M.ymax, yticks: M.yticks, fmt: M.fmt, shadeFrom: firstFrozen,
+          note: (i) => byYear[i].design + ", " + byYear[i].rows.toLocaleString() + " flows" });
+      document.getElementById("metric-note").textContent = M.note + " Shaded years: the frozen post-COVID test.";
+    }
+    document.querySelectorAll("#metric-tabs button").forEach((b) => (b.onclick = () => {
+      metric = b.dataset.m;
+      document.querySelectorAll("#metric-tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
+      drawMetric();
+    }));
+    ["m-model", "m-rule", "m-jump", "m-base"].forEach((id) => (document.getElementById(id).onchange = drawMetric));
+    drawMetric();
 
     groupedBars(document.getElementById("chart-top10"), byYear.map((d) => ({ label: d.answer_year, m: d.top10_model, r: d.top10_rule, b: d.base_rate })),
       [{ key: "m", name: "Boosted trees", color: "var(--model)" }, { key: "r", name: "Volatility rule", color: "var(--rule)" }, { key: "b", name: "Random picking", color: "var(--base)" }],
@@ -221,7 +277,7 @@
       `A list of 10% of flows cannot hold all of the roughly 22% that collapse, so most collapses are not on it. ` +
       `The list is a short list of the clearest risks, not a net that catches everything.`;
     if (J) document.getElementById("jump-text").innerHTML =
-      `Many of the highest risks are flows that just jumped, so we also tested a <b>jump rule</b>: rank flows by this year's change, biggest rise first. ` +
+      `Many of the highest risks are flows that just jumped, so I also tested a <b>jump rule</b>: rank flows by this year's change, biggest rise first. ` +
       `Its watch list is better than the volatility rule's (${pct(J["walk-forward"].top10)} vs ${pct(S.average["walk-forward"].top10_rule)} in 2011-2020), but its AUC is much lower ` +
       `(${f3(J["walk-forward"].auc)}), because it ranks the rest of the flows badly. The model beats it on AUC in <b>${J["walk-forward"].model_wins_auc} of 10</b> years ` +
       `and <b>${J.frozen.model_wins_auc} of 4</b> frozen years, and on watch-list hit rate in <b>${J["walk-forward"].model_wins_top10} of 10</b> and <b>${J.frozen.model_wins_top10} of 4</b>. ` +
@@ -292,7 +348,25 @@
           r: `<span class="riskbar" style="width:${Math.round(d.risk * 80)}px"></span>${pct(d.risk)} ${d.on_list ? '<span class="pill on">watch list</span>' : ""}`,
           why: d.reasons.length ? "<span class='small muted'>" + d.reasons.map((x) => esc(x.input)).join("; ") + "</span>" : "<span class='muted small'>nothing stands out</span>",
         })));
+      [...document.querySelectorAll("#w-table tr")].slice(1, shown.length + 1).forEach((tr, i) => {
+        tr.dataset.i = i;
+        tr.onclick = () => { document.querySelectorAll("#w-table tr.sel").forEach((x) => x.classList.remove("sel")); tr.classList.add("sel"); detail(shown[i]); };
+      });
       if (total > shown.length) document.getElementById("w-table").insertAdjacentHTML("beforeend", `<tr><td colspan="6" class="muted small">Showing the 25 riskiest of ${total}. Pick a country or product to narrow down.</td></tr>`);
+    }
+    function detail(d) {
+      const box = document.getElementById("w-detail");
+      const chg = d.chg_0 == null ? "it is a new flow" : `it changed by ${d.chg_0 > 0 ? "+" : ""}${pct(d.chg_0)} in 2024`;
+      let h = `<b>${esc(d.product)} to ${esc(d.country)}</b>: worth ${money(d.value_musd)} in 2024, and ${chg}. ` +
+        `The model gives it a <b>${pct(d.risk)}</b> chance of collapsing in 2025` + (d.on_list ? ", which puts it on the watch list." : ", which is not high enough for the watch list.");
+      if (d.lumpy) h += ` <span class="muted">This is a lumpy product (sold in a few big deals), so big swings are normal for it.</span>`;
+      if (d.reasons.length) {
+        const mx = Math.max(...d.reasons.map((r) => r.push));
+        h += `<div style="margin-top:8px">The inputs that pushed its risk up the most (SHAP):</div>` +
+          d.reasons.map((r) => `<div class="small"><span class="pushbar" style="width:${Math.max(4, Math.round((r.push / mx) * 120))}px"></span>${esc(r.input)} <span class="muted">(+${r.push.toFixed(2)} on the log-odds scale)</span></div>`).join("");
+      } else h += ` No single input stands out as pushing its risk up.`;
+      box.innerHTML = h;
+      box.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
     [sc, sp, cl, ck, document.getElementById("sel-size")].forEach((e) => e.addEventListener("change", draw));
     draw();
@@ -308,7 +382,8 @@
       const Y = +sy.value, s = q.value.trim().toLowerCase();
       const all = P.filter((d) => d.y === Y);
       const hits = all.filter((d) => d.hit).length;
-      const rows = all.filter((d) => !s || d.c.toLowerCase().includes(s) || d.p.toLowerCase().includes(s)).sort((a, b) => b.r - a.r);
+      const show = document.getElementById("past-show").value;
+      const rows = all.filter((d) => (!s || d.c.toLowerCase().includes(s) || d.p.toLowerCase().includes(s)) && (show === "all" || (show === "hit" ? d.hit : !d.hit))).sort((a, b) => b.r - a.r);
       document.getElementById("p-stat").innerHTML = `Answer year ${Y}${Y >= 2021 ? " (frozen model)" : ""}: the watch list had <b>${all.length}</b> flows and <b>${hits}</b> really collapsed, a hit rate of <b>${pct(hits / all.length)}</b>.`;
       const shown = rows.slice(0, 40);
       table("p-table", [{ t: "Country", k: "c" }, { t: "Product group", k: "p" }, { t: "Value year before", k: "v", n: 1 }, { t: "Risk", k: "r", n: 1 }, { t: "What happened", k: "h" }],
@@ -316,13 +391,13 @@
           h: d.hit ? `<span class="pill hit">collapsed</span> ${d.chg == null ? "stopped" : pct(d.chg)}` : `<span class="pill miss">false alarm</span> ${d.chg == null ? "" : (d.chg > 0 ? "+" : "") + pct(d.chg)}` })));
       if (rows.length > shown.length) document.getElementById("p-table").insertAdjacentHTML("beforeend", `<tr><td colspan="5" class="muted small">Showing 40 of ${rows.length}. Use search to narrow down.</td></tr>`);
     }
-    sy.addEventListener("change", draw); q.addEventListener("input", draw);
+    sy.addEventListener("change", draw); q.addEventListener("input", draw); document.getElementById("past-show").addEventListener("change", draw);
     draw();
   }
 
   // ---------- tabs, nav, repo link ----------
-  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
-    document.querySelectorAll(".tabs button").forEach((x) => { x.setAttribute("aria-selected", x === b); document.getElementById(x.dataset.tab).hidden = x !== b; });
+  document.querySelectorAll("#explorer .tabs button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#explorer .tabs button").forEach((x) => { x.setAttribute("aria-selected", x === b); document.getElementById(x.dataset.tab).hidden = x !== b; });
   }));
   const links = [...document.querySelectorAll("nav.top a")];
   const obs = new IntersectionObserver((ents) => ents.forEach((e) => {

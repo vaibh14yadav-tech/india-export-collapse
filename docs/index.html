@@ -12,6 +12,7 @@
 <body>
 <nav class="top" aria-label="Sections">
   <div class="inner">
+    <a href="#brief">In brief</a>
     <a href="#question">Question</a>
     <a href="#data">Data</a>
     <a href="#prep">Preprocessing</a>
@@ -23,6 +24,7 @@
     <a href="#limits">Limitations</a>
     <a href="#conclusion">Conclusion</a>
     <a href="#reproduce">Reproduce</a>
+    <a href="#ai">AI use &amp; sources</a>
   </div>
 </nav>
 
@@ -40,6 +42,19 @@
   </div>
 </header>
 
+<section id="brief">
+  <div class="kicker">In brief</div>
+  <h2>The answer in brief</h2>
+  <ul>
+    <li><b>Question:</b> using only what is known at the end of a year, can I tell which of India's export flows (one product group to one country) will fall by more than about a quarter, or stop, the next year?</li>
+    <li><b>Data:</b> 131,550 flows (206 countries, 96 product groups, 1996-2023), built from CEPII BACI trade data, CEPII Gravity and World Bank GDP and population.</li>
+    <li><b>Key fact about the data:</b> about 22% of flows collapse the next year, and a simple rule that flags the jumpiest flows already does well (AUC 0.69). That rule is the bar the model has to clear.</li>
+    <li><b>Result:</b> boosted trees beat the rule in all 10 walk-forward years (AUC 0.731 vs 0.694) and in all 4 post-COVID years with the model frozen (0.733 vs 0.701). Resampling whole countries, the 95% range of the gain is +0.031 to +0.043. About 54% of the model's watch list really collapses, against 47% for the rule and 23% for random picking.</li>
+    <li><b>Where it fails:</b> steady flows hit by a sudden drop in the buyer's demand, and "lumpy" products (fuel, gems, aircraft, ships) that crowd the watch list. For the biggest flows (over $100M) it is no better than the rule.</li>
+    <li><b>What it is not:</b> the scores are early-warning signals, not causes, and in real use the data arrives with a delay.</li>
+  </ul>
+</section>
+
 <!-- 1 -->
 <section id="question">
   <div class="kicker">1 · Problem formulation</div>
@@ -50,6 +65,15 @@
     <div class="step"><b>Target: collapse</b>Next year's value falls by more than 26% (log change below −0.3) or drops to zero.</div>
     <div class="step"><b>Prediction time</b>End of year t. Every input uses year t or earlier. Next year's numbers are never used. In real use, year-t trade data is published with a delay, so the warning would arrive later than this.</div>
     <div class="step"><b>Output</b>A risk score from 0 to 1 for each flow, and a watch list of the 10% riskiest.</div>
+  </div>
+  <div class="card" id="calc">
+    <div class="title">Try it: would this count as a collapse?</div>
+    <div class="muted small">Type in a flow's value this year and next year (in $ millions) and see how the project labels it.</div>
+    <div class="controls">
+      <label>Value this year ($M) <input type="number" id="calc-a" value="100" min="0" step="any"></label>
+      <label>Value next year ($M) <input type="number" id="calc-b" value="70" min="0" step="any"></label>
+    </div>
+    <div class="statline" id="calc-out"></div>
   </div>
   <h3>Prediction vs decision</h3>
   <p>The model <b>predicts</b> a risk score. It does not decide anything. The <b>decision</b> it supports is where to look first:
@@ -67,7 +91,7 @@
   <h2>Data</h2>
   <div class="table-wrap"><table>
     <tr><th>Source</th><th>What it gives</th><th>Access</th></tr>
-    <tr><td><b>CEPII BACI</b> (HS92, version 202601)</td><td>Every country's trade with every other, by 6-digit product, 1995-2024, in thousands of US$. We keep India's exports and every country's total imports, summed to 2-digit product groups.</td><td>Free download from cepii.fr (2.4 GB zip).</td></tr>
+    <tr><td><b>CEPII BACI</b> (HS92, version 202601)</td><td>Every country's trade with every other, by 6-digit product, 1995-2024, in thousands of US$. I keep India's exports and every country's total imports, summed to 2-digit product groups.</td><td>Free download from cepii.fr (2.4 GB zip).</td></tr>
     <tr><td><b>CEPII Gravity</b> (V202211)</td><td>Distance, shared border, shared language, WTO membership, trade agreements for each country pair.</td><td>Free download from cepii.fr.</td></tr>
     <tr><td><b>World Bank</b> (WDI, via the datasets/gdp and datasets/population mirrors)</td><td>GDP and population of each buying country.</td><td>Public CSV files, read directly in the notebook.</td></tr>
   </table></div>
@@ -100,13 +124,48 @@
   <p>Trade values are hugely skewed ($1M next to $10bn), so values are put on a <b>log scale</b>, and
   changes are <b>log changes</b> (log of this year minus log of last year). A log change of −0.3 means a fall of about 26%,
   and rises and falls of the same size become symmetric.</p>
+  <p>Every input was chosen <b>before testing</b>, from a simple economic idea of why a trade flow might fall.
+  I did not search through hundreds of possible inputs to find the ones that happened to score best, because that can produce patterns that are just luck.</p>
+  <h3>The flow's own history (7 inputs)</h3>
+  <p class="muted">The best guide to a flow's future is often its own past.</p>
   <div class="table-wrap"><table>
-    <tr><th>Group</th><th>Inputs</th><th>Idea</th></tr>
-    <tr><td><b>History of the flow</b> (7)</td><td>size (log value), change this year, last year and 2 years ago, volatility (spread of the last 5 changes), 3-year trend, years traded out of the last 5</td><td>Jumpy, shrinking or new flows fall more often.</td></tr>
-    <tr><td><b>Market</b> (6)</td><td>buyer's imports of this product (growth), buyer's total imports (growth), India's share of the buyer's market and its change, India's exports of this product to everyone (growth), the buyer's weight in India's exports</td><td>Is the buyer shrinking, or is India losing ground to other sellers?</td></tr>
-    <tr><td><b>Country</b> (8)</td><td>buyer's GDP growth, GDP and population (log share of the world), distance, shared border, shared language, WTO member, trade agreement</td><td>Slow-moving facts about the buyer and its link to India.</td></tr>
-    <tr><td><b>Co-movement</b> (3)</td><td>share of India's <i>other</i> products to this buyer that fell this year, their average change, share of <i>other</i> countries where this product fell</td><td>Collapses come in groups. The row itself is left out so it never sees its own value twice.</td></tr>
+    <tr><th>Input</th><th>What it is</th><th>Why it was chosen</th></tr>
+    <tr><td><b>Size</b></td><td>The flow's value that year (log scale)</td><td>Big, established flows are usually more stable than small ones.</td></tr>
+    <tr><td><b>Change this year, last year, 2 years ago</b></td><td>How much the flow rose or fell in each of the last 3 years</td><td>A flow that just jumped often falls back; one that keeps falling may keep falling. Three years was enough: 5 or 7 years of changes improved AUC by only about 0.001.</td></tr>
+    <tr><td><b>Volatility</b></td><td>How much the flow swung up and down over the last 5 years (spread of the yearly changes)</td><td>Flows that swing a lot are more likely to have a big drop. 5 years is a trade-off: with yearly data, fewer years gives too few numbers for a steady estimate, and more years lets old swings that no longer matter count. It is the same window often used for a stock's beta (5 years, or 60 months, of returns). The window was fixed before testing, not tuned.</td></tr>
+    <tr><td><b>3-year trend</b></td><td>The overall change over the last 3 years</td><td>Separates a flow that is slowly shrinking from one that is growing.</td></tr>
+    <tr><td><b>Years traded (of last 5)</b></td><td>In how many of the last 5 years India sold this product to this country at all</td><td>New or on-and-off flows are fragile and stop easily.</td></tr>
   </table></div>
+  <h3>The buyer's market (6 inputs)</h3>
+  <p class="muted">A flow can fall because the buyer wants less, or because the buyer switches to other sellers.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Input</th><th>What it is</th><th>Why it was chosen</th></tr>
+    <tr><td><b>Buyer's imports of this product</b></td><td>How much the country's imports of this product (from everyone) grew</td><td>If the country buys less of the product overall, India's sales will likely fall too.</td></tr>
+    <tr><td><b>Buyer's total imports</b></td><td>How much the country's imports of everything grew</td><td>A sign of a wider slowdown or crisis in the buying country.</td></tr>
+    <tr><td><b>India's market share, and its change</b></td><td>India's share of the country's imports of this product, and how it moved</td><td>A falling share means other sellers are winning the market.</td></tr>
+    <tr><td><b>India's exports of this product to all countries</b></td><td>How India's sales of this product to the whole world changed</td><td>Separates a problem with this buyer from a problem with India's supply.</td></tr>
+    <tr><td><b>Buyer's weight in India's exports</b></td><td>How important this country is among India's buyers</td><td>Large, important partners tend to be more stable relationships.</td></tr>
+  </table></div>
+  <h3>The buying country (8 inputs)</h3>
+  <p class="muted">Slow-moving facts about the buyer and its link to India.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Input</th><th>What it is</th><th>Why it was chosen</th></tr>
+    <tr><td><b>GDP growth</b></td><td>How fast the buyer's economy grew</td><td>A shrinking economy buys less.</td></tr>
+    <tr><td><b>Size of economy, population</b></td><td>The buyer's share of world GDP and population (log)</td><td>Small economies have smaller, less stable markets.</td></tr>
+    <tr><td><b>Distance</b></td><td>Distance between India and the buyer</td><td>Far-away trade is costlier and easier to drop.</td></tr>
+    <tr><td><b>Shared border, shared language</b></td><td>Whether the two countries share a border or an official language</td><td>Close, familiar partners tend to keep trading.</td></tr>
+    <tr><td><b>WTO membership, trade agreement</b></td><td>Whether the buyer is in the WTO and has a trade agreement with India</td><td>Trade rules and agreements make sudden barriers less likely.</td></tr>
+  </table></div>
+  <h3>India's other flows (3 inputs)</h3>
+  <p class="muted">Collapses tend to come in groups.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Input</th><th>What it is</th><th>Why it was chosen</th></tr>
+    <tr><td><b>Other products to this buyer that fell</b></td><td>Share of India's <i>other</i> products to this country that fell sharply this year</td><td>If many flows to one country are falling, that country may be in trouble.</td></tr>
+    <tr><td><b>Average change of other products to this buyer</b></td><td>Average change of India's <i>other</i> products to this country</td><td>The same idea, measured as an average.</td></tr>
+    <tr><td><b>This product falling in other countries</b></td><td>Share of <i>other</i> countries where this same product fell sharply</td><td>If a product falls everywhere, the problem is the product, not the buyer.</td></tr>
+  </table></div>
+  <p class="muted small">The row's own value is always left out of these three, so the model never sees its own number twice.
+  The ablation in Results shows how much each group adds.</p>
   <h3>Avoiding leakage</h3>
   <ul>
     <li>Every input is computed from year t or earlier. Next year's value is used only to make the answer (the target).</li>
@@ -123,10 +182,10 @@
   <div class="table-wrap"><table>
     <tr><th>Method</th><th>What it does</th><th>Why it is here</th></tr>
     <tr><td><b>Random</b></td><td>Picks flows at random.</td><td>The floor. Its watch-list hit rate is just the collapse rate (about 23%).</td></tr>
-    <tr><td><b>Jump rule</b></td><td>Ranks flows by this year's change, biggest rise first. No learning.</td><td>A second simple baseline: many of the riskiest flows are ones that just jumped, so we check whether this alone does as well.</td></tr>
-    <tr><td><b>Volatility rule</b></td><td>Ranks flows by how jumpy they were over the last 5 years. No learning.</td><td>The honest baseline: the first thing a trade analyst would try. Any model must beat this to be worth it.</td></tr>
-    <tr><td><b>Logistic regression</b></td><td>A weighted sum of the inputs, turned into a probability (L2 penalty, C = 1).</td><td>Simple, readable, but cannot see interactions (e.g. "jumpy <i>and</i> the buyer is shrinking").</td></tr>
-    <tr><td><b>Boosted trees</b> (scikit-learn HistGradientBoosting)</td><td>300 small trees, each fixing the mistakes of the ones before (learning rate 0.05).</td><td>Main model. Handles skewed inputs, blanks and interactions without hand-made features.</td></tr>
+    <tr><td><b>Jump rule</b></td><td>Ranks flows by this year's change, biggest rise first. No learning.</td><td>A second simple baseline: many of the riskiest flows are ones that just jumped, so I check whether this alone does as well.</td></tr>
+    <tr><td><b>Volatility rule</b></td><td>Ranks flows by their volatility (how much they swung over the last 5 years). No learning.</td><td>The honest baseline: the first thing a trade analyst would try. Any model must beat this to be worth it.</td></tr>
+    <tr><td><b>Logistic regression</b></td><td>A weighted sum of the inputs, turned into a probability (L2 penalty, C = 1). Blanks are filled with the median and every input is standardised (mean 0, spread 1) inside a pipeline, so the scaling is learned from training years only.</td><td>Simple, readable, but cannot see interactions (e.g. "jumpy <i>and</i> the buyer is shrinking").</td></tr>
+    <tr><td><b>Boosted trees</b> (scikit-learn HistGradientBoosting)</td><td>300 small trees, each fixing the mistakes of the ones before (learning rate 0.05).</td><td>Main model. Handles skewed inputs, blanks and interactions without hand-made features. No scaling is needed: a split like "volatility above 0.4" works the same at any scale.</td></tr>
     <tr><td><b>XGBoost</b></td><td>The same idea from another library (300 trees, depth 5, learning rate 0.05).</td><td>A check that the result is not one library's quirk. Also gives exact per-input reasons (SHAP).</td></tr>
   </table></div>
   <p>Boosted trees are the main model for all test results, including the "Check a past year" tool. XGBoost was tested in exactly the same way (AUC 0.735 vs 0.731).
@@ -141,13 +200,25 @@
   <p>A random train/test split would let the model learn from 2019 to "predict" 2012. That is not possible in real life,
   so it would give an over-optimistic score. Instead:</p>
   <div class="card">
-    <div class="title">Walk-forward test (answer years 2011-2020)</div>
-    <div class="muted small">For answer year Y, train on rows whose answer was known before Y, then test on the rows whose answer is Y. Retrain every year.</div>
+    <div class="title">See the test for any year</div>
+    <div class="muted small">Drag the slider to pick the year being predicted. Each box is one year of data. Blue rows train the model, the orange row is what it is tested on, and grey rows are the future it never sees.</div>
+    <div class="controls">
+      <label style="flex:1 1 260px">Year being predicted: <b id="wf-year">2013</b>
+        <input type="range" id="wf-slider" min="2011" max="2024" value="2013" step="1"></label>
+    </div>
     <div class="chart" id="chart-split"></div>
+    <div class="statline" id="wf-text"></div>
   </div>
+  <div class="callout"><b>Example.</b> To predict which flows collapse in <b>2013</b>, the model is trained only on rows from <b>2011 and earlier</b>,
+  because their outcomes (2012 and before) were already known at the end of 2012. It is then given each flow's <b>2012</b> numbers and asked
+  which will collapse in 2013, and its answers are compared with what really happened. The 2012 rows are not used for training here,
+  because their outcome <i>is</i> 2013, the year being predicted; they join the training data one step later, to predict 2014.
+  This is repeated for every year 2011-2020, and the reported score is the average of these 10 years.</div>
   <ul>
-    <li><b>Frozen post-COVID test (answer years 2021-2024):</b> train once on answers up to 2020, then score 2021, 2022, 2023 and 2024 without retraining.
-    This checks whether the model still works after COVID changed trade.</li>
+    <li><b>Frozen post-COVID test (answer years 2021-2024):</b> COVID disrupted world trade, so I check whether a model built on the pre-COVID world still works.
+    The model is trained <b>once</b> on all rows whose outcome was known by 2020, then <b>frozen</b>: it is never retrained or adjusted.
+    That same model predicts 2021, 2022, 2023 and 2024, and the reported score is the average of these 4 years.
+    None of these years was used for any choice, so this is the cleanest test.</li>
     <li><b>No tuning on test years.</b> Model settings were fixed sensible values chosen before testing and kept the same for every year.
     The one design choice explored (how many past changes to use: 1, 3, 5 or 7) was checked on the walk-forward years only; the differences were tiny (AUC 0.729-0.731), so the simple choice (3) was kept. The 2021-2024 years were not used for any choice.</li>
   </ul>
@@ -156,7 +227,7 @@
     <li><b>AUC:</b> pick one flow that collapsed and one that did not; how often does the method rank the collapsed one higher? 0.5 = coin flip. It does not depend on a threshold, and it is fair across years whose collapse rates differ.</li>
     <li><b>Top-10% hit rate:</b> of the 10% riskiest flows (the watch list), what share really collapsed? This matches the decision: a team that can review only a tenth of the flows.</li>
     <li><b>PR-AUC</b> and <b>Brier score</b> (how close probabilities are to what happened) are reported too. Accuracy is <i>not</i> used: with 78% of flows not collapsing, "nothing collapses" is already 78% accurate.</li>
-    <li><b>Uncertainty:</b> flows to the same country move together, so we resample <b>whole countries</b> 500 times (bootstrap) and recompute the AUC gain over the rule.</li>
+    <li><b>Uncertainty:</b> flows to the same country move together, so I resample <b>whole countries</b> 500 times (bootstrap) and recompute the AUC gain over the rule.</li>
   </ul>
 </section>
 
@@ -165,10 +236,22 @@
   <div class="kicker">6 · Results</div>
   <h2>Results</h2>
   <div class="card">
-    <div class="title">AUC by test year</div>
-    <div class="legend"><span><i style="background:var(--model)"></i>Boosted trees (model)</span><span><i style="background:var(--rule)"></i>Volatility rule</span><span><i class="dash"></i>Coin flip (0.5)</span></div>
+    <div class="title">Compare the methods year by year</div>
+    <div class="muted small">Pick a score and the methods to show. Hover or tap the chart for exact values.</div>
+    <div class="tabs" id="metric-tabs" role="tablist">
+      <button data-m="auc" aria-selected="true">AUC (ranking)</button>
+      <button data-m="top10" aria-selected="false">Watch list hit rate</button>
+      <button data-m="recall" aria-selected="false">Collapses caught</button>
+      <button data-m="pr" aria-selected="false">PR-AUC</button>
+    </div>
+    <div class="controls">
+      <label class="check"><input type="checkbox" id="m-model" checked> <i class="sw" style="background:var(--model)"></i>Boosted trees (model)</label>
+      <label class="check"><input type="checkbox" id="m-rule" checked> <i class="sw" style="background:var(--rule)"></i>Volatility rule</label>
+      <label class="check"><input type="checkbox" id="m-jump"> <i class="sw" style="background:var(--jump)"></i>Jump rule</label>
+      <label class="check"><input type="checkbox" id="m-base" checked> <i class="sw" style="background:var(--base)"></i>Random picking</label>
+    </div>
     <div class="chart" id="chart-auc"></div>
-    <div class="muted small">Shaded: frozen post-COVID test, model trained only on answers up to 2020. Hover for values.</div>
+    <div class="muted small" id="metric-note"></div>
   </div>
   <div class="card">
     <div class="title">Share of the top-10% watch list that really collapsed</div>
@@ -177,7 +260,13 @@
   </div>
   <h3>All methods (average over test years)</h3>
   <div class="table-wrap" id="models-table"></div>
-  <h3>How sure are we?</h3>
+  <h3>What these results show</h3>
+  <ul>
+    <li><b>The model beats the main baseline in every year:</b> all 10 walk-forward years and all 4 frozen post-COVID years. It still works after COVID without retraining.</li>
+    <li><b>The gain is real but modest:</b> about 0.04 AUC over the volatility rule on average.</li>
+    <li><b>The watch list is right about half the time,</b> more than twice as often as random picking. With about 600 flows on the list each year, 54% instead of 47% means roughly 40 more real collapses caught per year for the same amount of checking.</li>
+  </ul>
+  <h3>How sure can I be?</h3>
   <p id="boot-text">Loading…</p>
   <h3>Which inputs help? (ablation, walk-forward 2011-2020, boosted trees)</h3>
   <div class="table-wrap" id="ablation-table"></div>
@@ -212,6 +301,7 @@
       <label class="check"><input type="checkbox" id="chk-lumpy"> Hide lumpy products</label>
     </div>
     <div class="statline" id="w-stat"></div>
+    <div class="callout" id="w-detail">Tap or click any row below to see why the model rates that flow as risky.</div>
     <div class="table-wrap"><table id="w-table"></table></div>
   </div>
 
@@ -221,6 +311,7 @@
     <div class="controls">
       <label>Answer year <select id="sel-year"></select></label>
       <label>Search <input type="search" id="past-search" placeholder="Country or product"></label>
+      <label>Show <select id="past-show"><option value="all">Whole watch list</option><option value="hit">Only real collapses</option><option value="miss">Only false alarms</option></select></label>
     </div>
     <div class="statline" id="p-stat"></div>
     <div class="table-wrap"><table id="p-table"></table></div>
@@ -291,8 +382,36 @@
     (check: 131,550 rows, collapse share 0.219) and runs the walk-forward and frozen tests.</li>
     <li>Run <code>notebooks/analysis_and_website_data.ipynb</code>. It makes the error analysis, the bootstrap, the ablation, the 2025 watch list and the JSON files in <code>docs/data/</code>.</li>
   </ol>
+  <h3>Where the numbers come from</h3>
+  <p>Every number on this site was produced by running the code in the two notebooks. Nothing was typed in by hand.
+  The notebooks are saved with their outputs, so each result can be seen on GitHub printed under the code that produced it:</p>
+  <ul>
+    <li><code>export_collapse_full.ipynb</code>, Steps 1-8: building the data table, with check numbers.</li>
+    <li><code>export_collapse_full.ipynb</code>, Step 11: walk-forward results (2011-2020) for the volatility rule, logistic regression, boosted trees and XGBoost.</li>
+    <li><code>export_collapse_full.ipynb</code>, Step 12: frozen post-COVID results, year by year 2021-2024.</li>
+    <li><code>analysis_and_website_data.ipynb</code>, Step 4: random guessing, the jump rule, year-by-year scores and the bootstrap.</li>
+    <li><code>analysis_and_website_data.ipynb</code>, Steps 5-7: which inputs help, the error analysis and the 2025 watch list.</li>
+  </ul>
+  <p class="muted small">The charts read their numbers from <code>docs/data/</code>, which the second notebook writes. The outputs saved in the notebooks come from a second run on Google Colab
+  with slightly different library versions, so a few numbers differ in the third decimal (for example 4,417 instead of 4,408 collapses caught). The conclusions are the same.</p>
   <p>Fixed random seed 0 for all models. No data files are stored in the repository except the small result files the site reads.
   Full steps, citations and the AI-use note are in the <a id="repo-link" href="#">README</a>.</p>
+</section>
+<section id="ai">
+  <div class="kicker">12 · AI use and sources</div>
+  <h2>AI use and sources</h2>
+  <p><b>AI use.</b> An AI assistant (Claude, by Anthropic) was used throughout the project: to plan it, to explain each step, and to write most of the code, this website and the README.
+  I built the first part of the data table myself in my own Colab notebook, following the assistant's step-by-step instructions and checking each step against fixed check numbers.
+  The final notebooks were written by the assistant and run by me. Every number on this page comes from that code. I reviewed the AI-written code and text and I am responsible for the content.</p>
+  <p><b>Sources.</b></p>
+  <ul class="small">
+    <li>Gaulier, G. and Zignago, S. (2010). BACI: International Trade Database at the Product-Level. CEPII Working Paper 2010-23.</li>
+    <li>Conte, M., Cotterlaz, P. and Mayer, T. (2022). The CEPII Gravity Database. CEPII Working Paper 2022-05.</li>
+    <li>World Bank. World Development Indicators: GDP (current US$) and Population, total (via the datasets/gdp and datasets/population repositories on GitHub).</li>
+    <li>Pedregosa, F. et al. (2011). Scikit-learn: Machine Learning in Python. JMLR 12, 2825-2830.</li>
+    <li>Chen, T. and Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. KDD 2016, 785-794.</li>
+    <li>Lundberg, S. M. and Lee, S.-I. (2017). A Unified Approach to Interpreting Model Predictions. NeurIPS 30.</li>
+  </ul>
 </section>
 </main>
 
