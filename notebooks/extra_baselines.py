@@ -3,7 +3,8 @@
 import pandas as pd, numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier as H
 from sklearn.metrics import roc_auc_score
-d=pd.read_csv('/content/drive/MyDrive/my_table.csv')
+TABLE = '/content/drive/MyDrive/my_table.csv'  # change this to where export_collapse_full.ipynb saved the table
+d=pd.read_csv(TABLE)
 print(len(d), d.collapse.mean().round(3))
 c=d[d.collapse==1]
 nc=c.next_chg.fillna(-99)
