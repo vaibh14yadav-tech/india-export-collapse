@@ -1,17 +1,17 @@
-# Extra baselines and spike checks (README section 6 and 8). Reads the table built by export_collapse_full.ipynb.
-# Run in Colab after that notebook: python extra_baselines.py
+# Extra baselines and spike checks (README sections 6 and 8), using the table built by export_collapse_full.ipynb
 import pandas as pd, numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier as H
 from sklearn.metrics import roc_auc_score
-TABLE = '/content/drive/MyDrive/my_table.csv'  # change this to where export_collapse_full.ipynb saved the table
+TABLE = '/content/drive/MyDrive/my_table.csv'
 d=pd.read_csv(TABLE)
 print(len(d), d.collapse.mean().round(3))
+# How many collapses only undo that year's jump
 c=d[d.collapse==1]
 nc=c.next_chg.fillna(-99)
 print('collapses ending at/above level 2 yrs earlier (spike undone):', round(((c.chg_0+nc)>=0).mean(),3))
 print('collapses where flow had jumped >=50% that year:', round((c.chg_0>=np.log(1.5)).mean(),3), ' doubled:', round((c.chg_0>=np.log(2)).mean(),3))
 print('collapses that were stops:', round(c.next_chg.isna().mean(),3))
-# true drops below 3-yr-ago level? alt: next value below average of last 3 years
+# Two small trees on the same walk-forward and frozen tests
 hist=['log_trade','chg_0','chg_1','chg_2','volatility','trend_3y','years_traded_5']
 two=['chg_0','volatility']
 def run(cols,trainmax,tests):
