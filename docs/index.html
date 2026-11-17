@@ -111,6 +111,7 @@
     <li><b>Check numbers</b> were compared at every step (e.g. India's 2015 exports total $278.8bn in BACI; the Nigeria medicines flow in 2015 is $338.7M).</li>
     <li><b>New and restarting flows are not scored.</b> Rows where India sold nothing to that buyer the year before are dropped, because this year's change cannot be computed. The model only scores flows that traded in both of the last two years.</li>
     <li><b>Retired country codes look like stops.</b> When a country code ends in BACI, its flows fall to zero. The Netherlands Antilles was dissolved in 2010, so three of its flows appear on the 2011 watch list as "caught" collapses. These cases are few and were not removed.</li>
+    <li><b>The largest retired-code case is SACU.</b> Until 1999 BACI reports the Southern African Customs Union (South Africa and its neighbours) as one buyer; after that the countries appear separately. So 47 SACU flows show up as "stopped" in 1999. These are training years only, so they do not affect any test score, but they add some false collapses to the training data.</li>
     <li><b>Gaps:</b> World Bank GDP for the latest year is often not published yet, so it is left blank and the models handle blanks.
     The Gravity file ends in 2021, so later years carry the last known value forward (distance and language do not change).</li>
   </ul>
@@ -274,7 +275,7 @@
     <tr class="best"><td>Full model (24 inputs)</td><td class="n">0.731</td><td class="n">54.2%</td><td class="n">0.733</td><td class="n">51.4%</td></tr>
   </table></div>
   <p>So most of the model's skill comes from the flow's own history: just 2 inputs already beat the volatility rule.
-  The other 17 inputs (buyer's market, country facts, India's other flows) add only about +0.006 to +0.009 AUC and less than 1 point on the watch list.
+  The other 17 inputs (buyer's market, country facts, India's other flows) add only about +0.006 to +0.009 AUC, and almost nothing on the watch list: under 1 point in 2011-2020 and about zero on the frozen test when everything comes from one run (the full-model row is from the site's run, the small trees from a separate script).
   That is a real but small gain, and I report it as such.</p>
   <h3>What these results show</h3>
   <ul>
@@ -283,17 +284,17 @@
     <li><b>The watch list is right about half the time,</b> more than twice as often as random picking. With about 600 flows on the list each year, 54% instead of 47% means roughly 40 more real collapses caught per year for the same amount of checking.</li>
   </ul>
   <h3>How sure can I be?</h3>
-  <p id="boot-text">Loading…</p>
+  <p id="boot-text">Resampling whole countries 500 times, the model's AUC gain over the volatility rule is <b>+0.037</b> in the walk-forward years (95% range 0.031 to 0.043) and <b>+0.032</b> in the frozen post-COVID years (95% range 0.024 to 0.041). Both ranges stay above zero, so the gain is not luck in which countries were tested. The model beats the rule in <b>10 of 10</b> walk-forward years and <b>4 of 4</b> frozen years. <span class="muted">This covers which countries are in the test, not entirely new kinds of years.</span></p>
   <h3>Which inputs help? (ablation, walk-forward 2011-2020, boosted trees)</h3>
   <div class="table-wrap" id="ablation-table"></div>
   <p class="muted">Most of the skill comes from the flow's own history. Each extra group adds a little, and all together give the best score.
   The three learning models are within 0.025 AUC of each other.</p>
   <h3>How many collapses does the watch list catch?</h3>
-  <p id="recall-text">Loading…</p>
+  <p id="recall-text">Across 2011-2024 there were <b>18,295</b> collapses, and the model's watch list caught <b>4,408</b> of them (<b>24%</b>; the volatility rule's list caught 21%). A list of 10% of flows cannot hold all of the roughly 22% that collapse, so most collapses are not on it. The list is a short list of the clearest risks, not a net that catches everything.</p>
   <h3>Does "rank by this year's jump" do as well?</h3>
-  <p id="jump-text">Loading…</p>
+  <p id="jump-text">Many of the highest risks are flows that just jumped, so I also tested a <b>jump rule</b>: rank flows by this year's change, biggest rise first. Its watch list is better than the volatility rule's (52% vs 47% in 2011-2020), but its AUC is much lower (0.617), because it ranks the rest of the flows badly. The model beats it on AUC in <b>10 of 10</b> years and <b>4 of 4</b> frozen years, and on watch-list hit rate in <b>7 of 10</b> and <b>4 of 4</b>. So "it jumped, it will fall back" explains part of the model's watch list, but not all of it.</p>
   <h3>Is the model just finding the obvious?</h3>
-  <p id="obvious-text">Loading…</p>
+  <p id="obvious-text">Partly, yes. Of the collapses the watch list caught, <b>56%</b> were also on the volatility rule's list. Most of the other <b>44%</b> were flows that had jumped sharply that year, which the jump rule or a small tree on the flow's own history would also flag. <b>93%</b> of the caught flows had <i>not</i> already fallen that year, so the model is not just saying "it fell, so it will fall again"; much of what it catches is "it jumped, so it will fall back". The buyer, country and co-movement inputs add only a small extra gain (see Stronger simple baselines).</p>
 </section>
 
 <!-- 7 -->
@@ -344,14 +345,14 @@
   and a <b>missed collapse</b> (collapsed, but not on the list). All numbers below use the out-of-sample scores from 2011-2024.</p>
 
   <h3>Failure mode 1: steady flows hit by a shock from the buyer</h3>
-  <p id="fm1-text">Loading…</p>
+  <p id="fm1-text">The watch list catches <b>41%</b> of collapses among the jumpiest third of flows, but only <b>0.4%</b> among the steadiest third, even though steady flows still collapse 10% of the time. <b>21%</b> of missed collapses were steady flows, against 0.3% of caught ones. Missed collapses are also milder (median fall 43% vs 69% for caught ones), and in <b>26%</b> of them the buyer's total imports fell by more than 10% in the answer year, against 15% for all flows. That shock happens in the year being predicted, so no input could have shown it. <b>Why:</b> the model leans on a flow's own past, and a steady past says "safe". <b>What could help:</b> faster signals about the buyer (monthly trade data, currency or credit stress), or a separate model for steady flows.</p>
   <div class="card">
     <div class="title">Share of collapses the watch list caught, by how steady the flow had been</div>
     <div class="chart" id="chart-steady"></div>
   </div>
 
   <h3>Failure mode 2: lumpy products crowd the watch list</h3>
-  <p id="fm2-text">Loading…</p>
+  <p id="fm2-text">Fuel, gems and gold, aircraft, ships and arms are sold in a few huge one-off deals, so their values swing wildly. They are <b>4%</b> of all flows but <b>12%</b> of the watch list. Many of these warnings are right (hit rate 60%), but they push other flows off the list, and a warning that "an aircraft sale will not repeat" is rarely useful. On the false alarms, the largest ones are fuel and ore flows (see examples). <b>Fix used on this site:</b> lumpy products are marked, and the explorer can hide them.</p>
 
   <h3>Flows by size</h3>
   <div class="table-wrap" id="size-table"></div>
