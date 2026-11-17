@@ -51,16 +51,51 @@ The final table has **131,550 rows**, covering data years 1996 to 2023, and **21
 * The World Bank often has not yet published GDP for the latest year, so that value is left blank. The models are able to handle blanks.
 * The Gravity file ends in 2021, so later years reuse the last known values. Distance and language do not change, so this matters very little.
 
-## 3. What the model looks at
+## 3. What the model looks at, and why each input was chosen
 
-For every row, the model sees **24 inputs**, all calculated from information available at the end of that year:
+Every input was chosen **before testing**, from a simple economic idea of why a trade flow might fall. We did not search through hundreds of possible inputs to find the ones that happened to score best, because that can produce patterns that are just luck. All 24 inputs use only information available at the end of the year.
 
-| Group | Inputs | Why they might help |
+**The flow's own history (7 inputs).** The best guide to a flow's future is often its own past.
+
+| Input | What it is | Why it was chosen |
 |---|---|---|
-| **The flow's own history** (7) | its size; how much it changed this year, last year and two years ago; how much it usually swings (volatility over the last 5 years); its 3-year trend; how many of the last 5 years it was traded at all | Flows that swing a lot, are shrinking, or are new tend to collapse more often |
-| **The buyer's market** (6) | whether the buyer's imports of this product are growing; whether the buyer's total imports are growing; India's share of the buyer's market and how it changed; whether India's exports of this product to all countries are growing; how important this buyer is for India | Is the buyer shrinking, or is India losing ground to other sellers? |
-| **The buying country** (8) | GDP growth; size of its economy; population; distance from India; shared border; shared official language; WTO membership; trade agreement with India | Slow-moving facts about the buyer and its links to India |
-| **India's other flows** (3) | the share of India's *other* products to this buyer that fell sharply this year; their average change; the share of *other* countries where this same product fell | Collapses tend to come in groups, either across products to one country or across countries for one product |
+| Size | The flow's value that year (on a log scale) | Big, established flows are usually more stable than small ones |
+| Change this year, last year, 2 years ago | How much the flow rose or fell in each of the last 3 years | A flow that just jumped often falls back; one that keeps falling may keep falling. Three years was enough: using 5 or 7 years of changes improved AUC by only about 0.001 |
+| Volatility | How much the flow has swung up and down over the last 5 years | Flows that swing a lot are more likely to have a big drop |
+| 3-year trend | The overall change over the last 3 years | Separates a flow that is slowly shrinking from one that is growing |
+| Years traded (of last 5) | In how many of the last 5 years India sold this product to this country at all | New or on-and-off flows are fragile and stop easily |
+
+**The buyer's market (6 inputs).** A flow can fall because the buyer wants less, or because the buyer switches to other sellers.
+
+| Input | What it is | Why it was chosen |
+|---|---|---|
+| Buyer's imports of this product | How much the country's imports of this product (from everyone) grew | If the country is buying less of the product overall, India's sales will likely fall too |
+| Buyer's total imports | How much the country's imports of everything grew | A sign of a wider slowdown or crisis in the buying country |
+| India's market share, and its change | India's share of the country's imports of this product, and how it moved | A falling share means other sellers are winning the market |
+| India's exports of this product to all countries | How India's sales of this product to the whole world changed | Separates a problem with this buyer from a problem with India's supply of the product |
+| Buyer's weight in India's exports | How important this country is among India's buyers | Large, important partners tend to be more stable relationships |
+
+**The buying country (8 inputs).** Slow-moving facts about the buyer and its link to India.
+
+| Input | What it is | Why it was chosen |
+|---|---|---|
+| GDP growth | How fast the buyer's economy grew | A shrinking economy buys less |
+| Size of economy, population | The buyer's share of world GDP and population | Small economies have smaller, less stable markets |
+| Distance | Distance between India and the buyer | Far-away trade is costlier and easier to drop |
+| Shared border, shared language | Whether the two countries share a border or an official language | Close, familiar trading partners tend to keep trading |
+| WTO membership, trade agreement | Whether the buyer is in the WTO and has a trade agreement with India | Trade rules and agreements make sudden barriers less likely |
+
+**India's other flows (3 inputs).** Collapses tend to come in groups.
+
+| Input | What it is | Why it was chosen |
+|---|---|---|
+| Other products to this buyer that fell | Share of India's *other* products to this country that fell sharply this year | If many flows to one country are falling, that country may be in trouble |
+| Average change of other products to this buyer | Average change of India's *other* products to this country | The same idea, measured as an average |
+| This product falling in other countries | Share of *other* countries where this same product fell sharply | If a product is falling everywhere, the problem is the product, not the buyer |
+
+The row's own value is always left out of these three, so the model never sees its own number twice.
+
+**Did the inputs help?** Section 6 shows a test that adds the groups one at a time: the flow's history alone gives an AUC of 0.722, and each extra group raises it a little, to 0.731 with all 24.
 
 ## 4. The methods compared
 
