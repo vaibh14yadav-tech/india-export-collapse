@@ -52,7 +52,8 @@
     <li><b>Key fact about the data:</b> about 22% of flows collapse the next year, and a simple rule that flags the jumpiest flows already does well (AUC 0.69). That rule is the bar the model has to clear.</li>
     <li><b>Result:</b> boosted trees beat the rule in all 10 walk-forward years (AUC 0.731 vs 0.694) and in all 4 post-COVID years with the model frozen (0.733 vs 0.701). Resampling whole countries, the 95% range of the gain is +0.031 to +0.043. About 54% of the model's watch list really collapses, against 47% for the rule and 23% for random picking.</li>
     <li><b>Where it fails:</b> steady flows hit by a sudden drop in the buyer's demand, and "lumpy" products (fuel, gems, aircraft, ships) that crowd the watch list. For the biggest flows (over $100M) it is no better than the rule.</li>
-    <li><b>What it is not:</b> the scores are early-warning signals, not causes, and in real use the data arrives with a delay.</li>
+    <li><b>Honest caveats:</b> many "collapses" are spikes falling back (27% of collapses only undo that year's jump), most of the model's skill comes from the flow's own history (a tree on those 7 inputs alone gets AUC 0.722), and BACI data arrives about a year late, so in real use the warning would come late.</li>
+    <li><b>What it is not:</b> the scores are early-warning signals, not causes.</li>
   </ul>
 </section>
 
@@ -64,7 +65,7 @@
   <div class="flow">
     <div class="step"><b>One row</b>India's exports of one product group (2-digit HS code, e.g. "30 Pharmaceuticals") to one country in one year.</div>
     <div class="step"><b>Target: collapse</b>Next year's value falls by more than 26% (log change below −0.3) or drops to zero.</div>
-    <div class="step"><b>Prediction time</b>End of year t. Every input uses year t or earlier. Next year's numbers are never used. In real use, year-t trade data is published with a delay, so the warning would arrive later than this.</div>
+    <div class="step"><b>Prediction time</b>End of year t, as if year-t data were already available. Every input uses year t or earlier; next year's numbers are never used. In reality BACI data for a year is published about 13 months after the year ends, so a real warning would arrive after most of year t+1 has passed. The test measures how well the pattern predicts, not how early a real user would know.</div>
     <div class="step"><b>Output</b>A risk score from 0 to 1 for each flow. Sorting all flows by risk and taking the top 10% gives the <b>watch list</b>: the flows to check first, because a real team cannot check every flow.</div>
   </div>
   <div class="card" id="calc">
@@ -261,6 +262,18 @@
   </div>
   <h3>All methods (average over test years)</h3>
   <div class="table-wrap" id="models-table"></div>
+  <h3>Stronger simple baselines</h3>
+  <p>A fair question is whether the 24 inputs are needed, or whether a small tree on the flow's own numbers does just as well. I tested two smaller trees with the same walk-forward and frozen tests:</p>
+  <div class="table-wrap"><table>
+    <tr><th>Method</th><th class="n">AUC 2011-20</th><th class="n">Top-10% hit 2011-20</th><th class="n">AUC 2021-24 (frozen)</th><th class="n">Top-10% hit 2021-24</th></tr>
+    <tr><td>Volatility rule</td><td class="n">0.694</td><td class="n">47.0%</td><td class="n">0.701</td><td class="n">44.3%</td></tr>
+    <tr><td>Tree on 2 inputs (this year's change + volatility)</td><td class="n">0.712</td><td class="n">52.8%</td><td class="n">0.712</td><td class="n">48.5%</td></tr>
+    <tr><td>Tree on the flow's own history (7 inputs)</td><td class="n">0.722</td><td class="n">53.5%</td><td class="n">0.727</td><td class="n">50.7%</td></tr>
+    <tr class="best"><td>Full model (24 inputs)</td><td class="n">0.731</td><td class="n">54.2%</td><td class="n">0.733</td><td class="n">51.4%</td></tr>
+  </table></div>
+  <p>So most of the model's skill comes from the flow's own history: just 2 inputs already beat the volatility rule.
+  The other 17 inputs (buyer's market, country facts, India's other flows) add only about +0.006 to +0.009 AUC and less than 1 point on the watch list.
+  That is a real but small gain, and I report it as such.</p>
   <h3>What these results show</h3>
   <ul>
     <li><b>The model beats the main baseline in every year:</b> all 10 walk-forward years and all 4 frozen post-COVID years. It still works after COVID without retraining.</li>
@@ -293,7 +306,9 @@
   <div id="tab-2025" class="card">
     <p class="muted small" style="margin-top:0">The final model (XGBoost, trained on every answer up to 2024) scores India's 2024 flows. Their answer, 2025, was not in the data.
     Pick a country or a product to see its flows, the risk, and the three inputs that pushed the risk up most (SHAP values).
-    The highest risks are mostly flows that jumped sharply in 2024: the model has learned that sudden jumps usually fall back.</p>
+    The highest risks are mostly flows that jumped sharply in 2024: the model has learned that sudden jumps usually fall back.
+    Note: 2024 GDP was not yet published, so the GDP inputs are blank for all these flows, and the risk numbers are uncalibrated scores. Read the list as a ranking.
+    Also, because BACI arrives about a year late, 2025 has already ended; this list shows what the model would have flagged.</p>
     <div class="controls">
       <label>Country <select id="sel-country"></select></label>
       <label>Product group <select id="sel-product"></select></label>
@@ -352,6 +367,11 @@
     <li><b>Almost no gain for the biggest flows.</b> For flows over $100M, the model's AUC is 0.753 and the volatility rule's is 0.752. These are the flows that matter most to an exporter, so for them the simple rule is about as good.</li>
     <li><b>The watch list misses most collapses.</b> A list of 10% of flows can only hold part of the roughly 22% that collapse; it caught about a quarter of all collapses.</li>
     <li><b>2011-2020 was used both to develop and to report.</b> Settings were fixed in advance and only one small design choice was checked on these years, but the frozen 2021-2024 test is the cleanest result.</li>
+    <li><b>Many collapses are spikes falling back.</b> A collapse is measured against this year's value, so a flow that jumps 4× and then gives back a quarter counts as a collapse.
+    27% of all collapses end at or above the level of two years earlier (they only undo that year's jump), and 30% came right after the flow at least doubled.
+    So the label mixes real lost markets with jumps falling back, and much of the watch list is the second kind. A target measured against a 3-year average would separate them; I leave that for future work.</li>
+    <li><b>The 2025 list uses blank GDP.</b> 2024 GDP was not yet published when the data was built, so both GDP inputs are blank for every 2024 flow, while they are almost always filled in training. This can push the 2025 risk scores up, so the 2025 list is best read as a ranking. Carrying 2023 GDP forward (as I already do for the Gravity data) would fix it.</li>
+    <li><b>Risk scores are not checked percentages.</b> The scores were not calibrated, so "70%" should be read as "high on the ranking", not as an exact probability.</li>
     <li><b>Blind to new shocks.</b> Bans, wars, sanctions and sudden policy changes leave no trace in past trade, so steady flows hit by them are missed.</li>
     <li><b>2-digit product groups are coarse.</b> "Machinery" mixes very different goods; a collapse in one part can be hidden by growth in another.</li>
     <li><b>The 26% cut-off is a choice.</b> A different line gives a different question. The table also keeps a stricter target (the flow halves or stops), left for future work.</li>
@@ -394,7 +414,8 @@
     <li><code>analysis_and_website_data.ipynb</code>, Steps 5-7: which inputs help, the error analysis and the 2025 watch list.</li>
   </ul>
   <p class="muted small">The charts read their numbers from <code>docs/data/</code>, which the second notebook writes. The outputs saved in the notebooks come from a second run on Google Colab
-  with slightly different library versions, so a few numbers differ in the third decimal (for example 4,417 instead of 4,408 collapses caught). The conclusions are the same.</p>
+  with slightly different library versions. Overall averages differ only in the third decimal (for example AUC 0.730 vs 0.731, 4,417 vs 4,408 collapses caught), but single-year watch-list hit rates can differ by up to about 2 points.
+This changes one count: the model beats the jump rule's watch list in 11 of 14 years in the site's run and 13 of 14 in the saved notebooks. The main conclusions are the same.</p>
   <p>Fixed random seed 0 for all models. No data files are stored in the repository except the small result files the site reads.
   Full steps, citations and the AI-use note are in the <a id="repo-link" href="#">README</a>.</p>
 </section>

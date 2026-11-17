@@ -283,9 +283,10 @@
       `and <b>${J.frozen.model_wins_auc} of 4</b> frozen years, and on watch-list hit rate in <b>${J["walk-forward"].model_wins_top10} of 10</b> and <b>${J.frozen.model_wins_top10} of 4</b>. ` +
       `So "it jumped, it will fall back" explains part of the model's watch list, but not all of it.`;
     document.getElementById("obvious-text").innerHTML =
-      `Partly. Of the collapses the watch list caught, <b>${pct(F.caught_also_on_rule_list)}</b> were also on the volatility rule's list: jumpy flows anyone would flag. ` +
-      `The other <b>${pct(1 - F.caught_also_on_rule_list)}</b> the rule missed; the model found them by combining clues such as a shrinking buyer or India's other products to that country falling. ` +
-      `And <b>${pct(F.caught_not_already_falling)}</b> of the caught flows had <i>not</i> already fallen that year, so the model is not just saying "it fell, so it will fall again".`;
+      `Partly, yes. Of the collapses the watch list caught, <b>${pct(F.caught_also_on_rule_list)}</b> were also on the volatility rule's list. ` +
+      `Most of the other <b>${pct(1 - F.caught_also_on_rule_list)}</b> were flows that had jumped sharply that year, which the jump rule or a small tree on the flow's own history would also flag. ` +
+      `<b>${pct(F.caught_not_already_falling)}</b> of the caught flows had <i>not</i> already fallen that year, so the model is not just saying "it fell, so it will fall again"; ` +
+      `much of what it catches is "it jumped, so it will fall back". The buyer, country and co-movement inputs add only a small extra gain (see Stronger simple baselines).`;
 
     // errors
     const st = E.bands.filter((b) => b.by === "steadiness");
@@ -341,7 +342,7 @@
       const val = rows.reduce((s, d) => s + d.value_musd, 0);
       document.getElementById("w-stat").innerHTML = `<b>${total.toLocaleString()}</b> flows worth ${money(val)} in 2024 · <b>${onl}</b> on the 2025 watch list (top 10% overall)`;
       const shown = rows.slice(0, 25);
-      table("w-table", [{ t: "Country", k: "c" }, { t: "Product group", k: "p" }, { t: "2024 value", k: "v", n: 1 }, { t: "Change 2024", k: "g", n: 1 }, { t: "Risk of collapse in 2025", k: "r" }, { t: "Main reasons risk is up", k: "why" }],
+      table("w-table", [{ t: "Country", k: "c" }, { t: "Product group", k: "p" }, { t: "2024 value", k: "v", n: 1 }, { t: "Change 2024", k: "g", n: 1 }, { t: "Risk score for 2025 (ranking)", k: "r" }, { t: "Main reasons risk is up", k: "why" }],
         shown.map((d) => ({
           c: esc(d.country), p: esc(d.product) + (d.lumpy ? ' <span class="pill">lumpy</span>' : ""), v: money(d.value_musd),
           g: d.chg_0 == null ? "new" : d.chg_0 >= 2 ? "×" + (1 + d.chg_0).toFixed(d.chg_0 >= 9 ? 0 : 1) : (d.chg_0 > 0 ? "+" : "") + pct(d.chg_0),
@@ -358,13 +359,14 @@
       const box = document.getElementById("w-detail");
       const chg = d.chg_0 == null ? "it is a new flow" : `it changed by ${d.chg_0 > 0 ? "+" : ""}${pct(d.chg_0)} in 2024`;
       let h = `<b>${esc(d.product)} to ${esc(d.country)}</b>: worth ${money(d.value_musd)} in 2024, and ${chg}. ` +
-        `The model gives it a <b>${pct(d.risk)}</b> chance of collapsing in 2025` + (d.on_list ? ", which puts it on the watch list." : ", which is not high enough for the watch list.");
+        `The model gives it a risk score of <b>${pct(d.risk)}</b> for 2025 (an uncalibrated score, best read as a ranking)` + (d.on_list ? ", which puts it on the watch list." : ", which is not high enough for the watch list.");
       if (d.lumpy) h += ` <span class="muted">This is a lumpy product (sold in a few big deals), so big swings are normal for it.</span>`;
       if (d.reasons.length) {
         const mx = Math.max(...d.reasons.map((r) => r.push));
         h += `<div style="margin-top:8px">The inputs that pushed its risk up the most (SHAP):</div>` +
           d.reasons.map((r) => `<div class="small"><span class="pushbar" style="width:${Math.max(4, Math.round((r.push / mx) * 120))}px"></span>${esc(r.input)} <span class="muted">(+${r.push.toFixed(2)} on the log-odds scale)</span></div>`).join("");
       } else h += ` No single input stands out as pushing its risk up.`;
+      h += `<div class="small muted" style="margin-top:6px">2024 GDP was not yet published, so the GDP inputs are blank for this flow; the reasons list leaves blank inputs out.</div>`;
       box.innerHTML = h;
       box.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
