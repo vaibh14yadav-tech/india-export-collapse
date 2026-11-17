@@ -53,11 +53,11 @@ Both notebooks run on Google Colab (scikit-learn, XGBoost, pandas and matplotlib
 
 1. Open `notebooks/export_collapse_full.ipynb` in Colab and choose **Runtime → Run all**.
    It builds the table from the raw BACI zip (10-20 minutes the first time; it saves `my_india_hs2.csv` and `my_world_imports_hs2.csv` to Drive so later runs take seconds), then runs the walk-forward and frozen tests.
-   Check numbers: grid 591,060 rows; final table **131,550 rows**, collapse share **0.219**; average AUC rule 0.694, boosted trees 0.731.
+   Check numbers: grid 591,060 rows; final table **131,550 rows**, collapse share **0.219**; average AUC rule 0.694, boosted trees 0.730-0.731.
 2. Open `notebooks/analysis_and_website_data.ipynb` and run all. It rebuilds the out-of-sample predictions, the bootstrap, the ablation, the error analysis and the 2025 watch list, and writes `summary.json`, `watchlist_2025.json` and `past_watchlists.json` to `My Drive/website_data`.
 3. Copy those three files into `docs/data/`. To preview the site locally: `python3 -m http.server 8000 --directory docs`, then open http://localhost:8000.
 
-All models use `random_state=0`. Model settings were fixed in advance and are the same for every test year; the 2021-2024 years were not used for any choice.
+The website and this README use one run of the notebooks; the saved Colab outputs in `notebooks/` come from a second run with slightly different library versions, so a few numbers differ in the third decimal (for example 4,417 vs 4,408 collapses caught, trees AUC 0.730 vs 0.731). The conclusions are the same. All models use `random_state=0`. Model settings were fixed in advance and are the same for every test year; the 2021-2024 years were not used for any choice.
 
 ## 5. Repository structure
 
