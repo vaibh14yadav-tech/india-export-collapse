@@ -266,6 +266,50 @@
       `The model beats the rule in <b>${S.wins["walk-forward"]} of 10</b> walk-forward years and <b>${S.wins.frozen} of 4</b> frozen years. ` +
       `<span class="muted">This covers which countries are in the test, not entirely new kinds of years.</span>`;
 
+    if (B["walk-forward"].hit_gain != null) document.getElementById("boot-text").innerHTML +=
+      ` The same resampling for the <b>watch-list hit rate</b> gives a gain of <b>+${pct(B["walk-forward"].hit_gain, 1)}</b> in 2011-2020 (95% range ${pct(B["walk-forward"].hit_low, 1)} to ${pct(B["walk-forward"].hit_high, 1)}) ` +
+      `and <b>${B.frozen.hit_gain >= 0 ? "+" : ""}${pct(B.frozen.hit_gain, 1)}</b> in 2021-2024 (95% range ${pct(B.frozen.hit_low, 1)} to ${pct(B.frozen.hit_high, 1)}).`;
+
+    const X = S.extra_baselines;
+    if (X) {
+      const row = (name, k, cls) => ({ m: name, a1: f3(X[k]["walk-forward"].auc), t1: pct(X[k]["walk-forward"].top10, 1), a2: f3(X[k].frozen.auc), t2: pct(X[k].frozen.top10, 1), _class: cls || "" });
+      table("extra-table", [{ t: "Method", k: "m" }, { t: "AUC 2011-20", k: "a1", n: 1 }, { t: "Top-10% hit 2011-20", k: "t1", n: 1 }, { t: "AUC 2021-24 (frozen)", k: "a2", n: 1 }, { t: "Top-10% hit 2021-24", k: "t2", n: 1 }], [
+        { m: "Volatility rule", a1: f3(S.average["walk-forward"].auc_rule), t1: pct(S.average["walk-forward"].top10_rule, 1), a2: f3(S.average.frozen.auc_rule), t2: pct(S.average.frozen.top10_rule, 1) },
+        row("Tree on 2 inputs (this year's change + volatility)", "two_input_tree"), row("Tree on the flow's own history (7 inputs)", "history_tree"), row("Full model (24 inputs)", "full_model", "best")]);
+      const ga = (d) => X.full_model[d].auc - X.history_tree[d].auc, gt = (d) => X.full_model[d].top10 - X.history_tree[d].top10;
+      const sp = (v) => (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + " points";
+      document.getElementById("extra-text").innerHTML =
+        `So most of the model's skill comes from the flow's own history: just 2 inputs already beat the volatility rule. ` +
+        `The other 17 inputs (buyer's market, country facts, India's other flows) add ${ga("walk-forward") >= 0 ? "+" : ""}${f3(ga("walk-forward"))} AUC in 2011-2020 and ${ga("frozen") >= 0 ? "+" : ""}${f3(ga("frozen"))} in 2021-2024, ` +
+        `and ${sp(gt("walk-forward"))} and ${sp(gt("frozen"))} on the watch list. All rows of this table come from the same run. That is a small gain, and I report it as such.`;
+    }
+    const Hv = S.halves;
+    if (Hv) document.getElementById("halves-text").innerHTML =
+      `If "collapse" means the flow <b>halves or stops</b> (log change below −0.69), only ${pct(Hv.share_of_rows, 1)} of flows qualify. ` +
+      `The model still beats the volatility rule: AUC <b>${f3(Hv.model["walk-forward"].auc)}</b> vs ${f3(Hv.rule["walk-forward"].auc)} in 2011-2020 and <b>${f3(Hv.model.frozen.auc)}</b> vs ${f3(Hv.rule.frozen.auc)} in 2021-2024. ` +
+      `Its watch-list hit rate is ${pct(Hv.model["walk-forward"].top10)} and ${pct(Hv.model.frozen.top10)} (rule: ${pct(Hv.rule["walk-forward"].top10)} and ${pct(Hv.rule.frozen.top10)}; random picking: ${pct(Hv.model["walk-forward"].base)} and ${pct(Hv.model.frozen.base)}).`;
+    const C = S.calibration;
+    if (C) {
+      const bins = C.bins;
+      const box = document.getElementById("chart-calib");
+      const F2 = frame(box, { height: 260, ymin: 0, ymax: 0.8, yticks: [0, 0.2, 0.4, 0.6, 0.8], fmt: (t) => pct(t) });
+      const X2 = (v) => F2.m.l + (v / 0.8) * F2.W;
+      el("line", { x1: X2(0), y1: F2.y(0), x2: X2(0.8), y2: F2.y(0.8), stroke: "var(--base)", "stroke-width": 1.5, "stroke-dasharray": "4 3" }, F2.svg);
+      [0, 0.2, 0.4, 0.6, 0.8].forEach((t) => { const tx = el("text", { x: X2(t), y: F2.m.t + F2.H + 18, "text-anchor": "middle" }, F2.ax); tx.textContent = pct(t); });
+      el("path", { d: bins.map((b, i) => (i ? "L" : "M") + X2(b.mean_risk) + "," + F2.y(b.real_rate)).join(" "), fill: "none", stroke: "var(--model)", "stroke-width": 2 }, F2.svg);
+      bins.forEach((b) => {
+        const c = el("circle", { cx: X2(b.mean_risk), cy: F2.y(b.real_rate), r: 5, fill: "var(--model)", stroke: "var(--surface)", "stroke-width": 2 }, F2.svg);
+        c.addEventListener("mousemove", (e) => showTip(e, `${b.rows.toLocaleString()} flows<br>average risk: <b>${pct(b.mean_risk, 1)}</b><br>really collapsed: <b>${pct(b.real_rate, 1)}</b>`));
+        c.addEventListener("mouseleave", hideTip);
+      });
+      const top = bins[bins.length - 1], low = bins[0];
+      const maxGap = Math.max(...bins.map((b) => Math.abs(b.real_rate - b.mean_risk)));
+      document.getElementById("calib-text").innerHTML =
+        `The riskiest tenth of flows had an average risk of <b>${pct(top.mean_risk)}</b> and <b>${pct(top.real_rate)}</b> really collapsed; the safest tenth had ${pct(low.mean_risk)} and ${pct(low.real_rate)}. ` +
+        `The largest gap between predicted and real rates in any group is ${(maxGap * 100).toFixed(1)} points, and the Brier score is ${C.brier.toFixed(3)}. ` +
+        (maxGap < 0.05 ? `So the scores are roughly honest percentages, though they were not adjusted (calibrated) after training.` : `So the scores rank flows well but should not be read as exact percentages.`);
+    }
+
     table("ablation-table", [{ t: "Inputs used", k: "i" }, { t: "Number", k: "n", n: 1 }, { t: "AUC 2011-20", k: "a", n: 1 }],
       S.ablation.map((d) => ({ i: d.inputs, n: d.n_inputs, a: f3(d.auc) })).concat([{ i: "<span class='muted'>volatility rule, for comparison</span>", n: 1, a: f3(S.average["walk-forward"].auc_rule) }]));
 
@@ -342,7 +386,7 @@
       const val = rows.reduce((s, d) => s + d.value_musd, 0);
       document.getElementById("w-stat").innerHTML = `<b>${total.toLocaleString()}</b> flows worth ${money(val)} in 2024 · <b>${onl}</b> on the 2025 watch list (top 10% overall)`;
       const shown = rows.slice(0, 25);
-      table("w-table", [{ t: "Country", k: "c" }, { t: "Product group", k: "p" }, { t: "2024 value", k: "v", n: 1 }, { t: "Change 2024", k: "g", n: 1 }, { t: "Risk score for 2025 (ranking)", k: "r" }, { t: "Main reasons risk is up", k: "why" }],
+      table("w-table", [{ t: "Country", k: "c" }, { t: "Product group", k: "p" }, { t: "2024 value", k: "v", n: 1 }, { t: "Change 2024", k: "g", n: 1 }, { t: "Risk of collapse in 2025", k: "r" }, { t: "Main reasons risk is up", k: "why" }],
         shown.map((d) => ({
           c: esc(d.country), p: esc(d.product) + (d.lumpy ? ' <span class="pill">lumpy</span>' : ""), v: money(d.value_musd),
           g: d.chg_0 == null ? "new" : d.chg_0 >= 2 ? "×" + (1 + d.chg_0).toFixed(d.chg_0 >= 9 ? 0 : 1) : (d.chg_0 > 0 ? "+" : "") + pct(d.chg_0),
@@ -359,14 +403,13 @@
       const box = document.getElementById("w-detail");
       const chg = d.chg_0 == null ? "it is a new flow" : `it changed by ${d.chg_0 > 0 ? "+" : ""}${pct(d.chg_0)} in 2024`;
       let h = `<b>${esc(d.product)} to ${esc(d.country)}</b>: worth ${money(d.value_musd)} in 2024, and ${chg}. ` +
-        `The model gives it a risk score of <b>${pct(d.risk)}</b> for 2025 (an uncalibrated score, best read as a ranking)` + (d.on_list ? ", which puts it on the watch list." : ", which is not high enough for the watch list.");
+        `The model gives it a risk score of <b>${pct(d.risk)}</b> for 2025 (scores were checked against real collapse rates in past years)` + (d.on_list ? ", which puts it on the watch list." : ", which is not high enough for the watch list.");
       if (d.lumpy) h += ` <span class="muted">This is a lumpy product (sold in a few big deals), so big swings are normal for it.</span>`;
       if (d.reasons.length) {
         const mx = Math.max(...d.reasons.map((r) => r.push));
         h += `<div style="margin-top:8px">The inputs that pushed its risk up the most (SHAP):</div>` +
           d.reasons.map((r) => `<div class="small"><span class="pushbar" style="width:${Math.max(4, Math.round((r.push / mx) * 120))}px"></span>${esc(r.input)} <span class="muted">(+${r.push.toFixed(2)} on the log-odds scale)</span></div>`).join("");
       } else h += ` No single input stands out as pushing its risk up.`;
-      h += `<div class="small muted" style="margin-top:6px">2024 GDP was not yet published, so the GDP inputs are blank for this flow; the reasons list leaves blank inputs out.</div>`;
       box.innerHTML = h;
       box.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
